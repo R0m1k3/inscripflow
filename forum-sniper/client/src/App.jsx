@@ -141,6 +141,14 @@ function App() {
 
                         {/* Actions */}
                         <div className="mt-4 flex justify-end gap-2 border-t border-gray-800 pt-3">
+                            <button
+                                onClick={() => fetch(`${API_URL}/api/targets/${target.id}/check`, { method: 'POST' })}
+                                disabled={target.status === 'CHECKING'}
+                                className={`p-1 ${target.status === 'CHECKING' ? 'text-gray-700 cursor-not-allowed' : 'text-gray-500 hover:text-green-500'}`}
+                                title="Run Check Now"
+                            >
+                                <PlayCircle className="w-4 h-4" />
+                            </button>
                             <button onClick={() => deleteTarget(target.id)} className="text-gray-500 hover:text-red-500 p-1">
                                 <Trash2 className="w-4 h-4" />
                             </button>

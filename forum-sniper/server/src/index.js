@@ -104,31 +104,49 @@ const updateStatus = (targetId, status) => {
   }
 };
 
+// Reusable Check Logic
+const runTargetCheck = async (target) => {
+  updateStatus(target.id, 'CHECKING');
+  log(target.id, `Checking status for ${target.url}...`);
+
+  try {
+    const result = await checkTarget(target, (msg) => log(target.id, msg));
+
+    if (result.success) {
+      updateStatus(target.id, 'REGISTERED');
+      log(target.id, 'SUCCESS: Registration completed!');
+    } else if (result.open) {
+      updateStatus(target.id, 'OPEN');
+      log(target.id, 'WARNING: Registration seems open but failed to automate.');
+    } else {
+      updateStatus(target.id, 'CLOSED');
+      log(target.id, 'Registration appears closed.');
+    }
+  } catch (error) {
+    updateStatus(target.id, 'ERROR');
+    log(target.id, `Error: ${error.message}`);
+  }
+};
+
+// Check Endpoint
+app.post('/api/targets/:id/check', async (req, res) => {
+  const target = targets.find(t => t.id === req.params.id);
+  if (!target) return res.status(404).json({ error: 'Target not found' });
+
+  // Don't await the check so we return immediately
+  runTargetCheck(target);
+
+  res.json({ success: true, message: 'Check initiated' });
+});
+
 // Check Loop (Every 60s for demo, can be faster)
 setInterval(async () => {
   for (const target of targets) {
     if (target.status === 'REGISTERED') continue;
+    // Avoid double checking if already in progress (optional, but good practice)
+    if (target.status === 'CHECKING') continue;
 
-    updateStatus(target.id, 'CHECKING');
-    log(target.id, `Checking status for ${target.url}...`);
-
-    try {
-      const result = await checkTarget(target, (msg) => log(target.id, msg));
-
-      if (result.success) {
-        updateStatus(target.id, 'REGISTERED');
-        log(target.id, 'SUCCESS: Registration completed!');
-      } else if (result.open) {
-        updateStatus(target.id, 'OPEN');
-        log(target.id, 'WARNING: Registration seems open but failed to automate.');
-      } else {
-        updateStatus(target.id, 'CLOSED');
-        log(target.id, 'Registration appears closed.');
-      }
-    } catch (error) {
-      updateStatus(target.id, 'ERROR');
-      log(target.id, `Error: ${error.message}`);
-    }
+    await runTargetCheck(target);
   }
 }, 30000); // 30 seconds loop
 
