@@ -85,6 +85,7 @@ io.on('connection', (socket) => {
 
 // Worker Loop
 const log = (targetId, message) => {
+  console.log(`[LOG:${targetId}] ${message}`); // Debug to stdout
   const target = targets.find(t => t.id === targetId);
   if (target) {
     const logEntry = `[${new Date().toLocaleTimeString()}] ${message}`;
@@ -130,6 +131,7 @@ const runTargetCheck = async (target) => {
 
 // Check Endpoint
 app.post('/api/targets/:id/check', async (req, res) => {
+  console.log(`[API] Force check requested for ${req.params.id}`);
   const target = targets.find(t => t.id === req.params.id);
   if (!target) return res.status(404).json({ error: 'Target not found' });
 
@@ -139,16 +141,30 @@ app.post('/api/targets/:id/check', async (req, res) => {
   res.json({ success: true, message: 'Check initiated' });
 });
 
-// Check Loop (Every 60s for demo, can be faster)
-setInterval(async () => {
-  for (const target of targets) {
-    if (target.status === 'REGISTERED') continue;
-    // Avoid double checking if already in progress (optional, but good practice)
-    if (target.status === 'CHECKING') continue;
+// Random Scheduler (Stealth Mode)
+const MIN_INTERVAL = 45 * 60 * 1000; // 45 minutes
+const MAX_INTERVAL = 90 * 60 * 1000; // 90 minutes
 
-    await runTargetCheck(target);
-  }
-}, 30000); // 30 seconds loop
+const startScheduler = () => {
+  const delay = Math.floor(Math.random() * (MAX_INTERVAL - MIN_INTERVAL + 1)) + MIN_INTERVAL;
+  const nextCheck = new Date(Date.now() + delay).toLocaleTimeString();
+
+  console.log(`[SCHEDULER] Next check loop scheduled in ${Math.round(delay / 60000)} minutes (${nextCheck})`);
+
+  setTimeout(async () => {
+    console.log(`[SCHEDULER] Starting check batch...`);
+    for (const target of targets) {
+      if (target.status === 'REGISTERED') continue;
+      if (target.status === 'CHECKING') continue;
+      await runTargetCheck(target);
+    }
+    // Schedule next run
+    startScheduler();
+  }, delay);
+};
+
+// Start initial loop
+startScheduler();
 
 httpServer.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);

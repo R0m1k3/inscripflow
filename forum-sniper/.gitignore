@@ -1,0 +1,12 @@
+logs/
+node_modules/
+.env
+.DS_Store
+dist/
+build/
+coverage/
+targets.json
+settings.json
+server/targets.json
+server/settings.json
+*.log
