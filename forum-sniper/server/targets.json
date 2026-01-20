@@ -59,5 +59,25 @@
       "[8:42:48 PM] Standard heuristics inconclusive. Engaging AI..."
     ],
     "lastCheck": "2026-01-20T20:45:18.496Z"
+  },
+  {
+    "id": "1768942142589",
+    "url": "https://generation-free.org/login",
+    "pseudo": "Meylann69",
+    "email": "mikevonrod@gmail.com",
+    "password": "Lapin2509$",
+    "status": "CLOSED",
+    "logs": [
+      "[8:49:07 PM] No successful registration path found.",
+      "[8:49:07 PM] AI could not generate a valid plan.",
+      "[8:49:07 PM] AI Error: 401 User not found.",
+      "[8:49:07 PM] Sending form to Gemini AI for analysis...",
+      "[8:49:07 PM] Standard heuristics inconclusive. Engaging AI...",
+      "[8:49:07 PM] No obvious form found. Searching for 'Register' link...",
+      "[8:49:07 PM] Navigating to https://generation-free.org/login...",
+      "[8:49:06 PM] Connecting to Browserless at ws://browserless:3000...",
+      "[8:49:06 PM] Checking status for https://generation-free.org/login..."
+    ],
+    "lastCheck": "2026-01-20T20:49:07.759Z"
   }
 ]
