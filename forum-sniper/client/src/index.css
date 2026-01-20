@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom Scrollbar for Logs */
+.logs-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.logs-scrollbar::-webkit-scrollbar-track {
+  background: #1f2937; 
+}
+.logs-scrollbar::-webkit-scrollbar-thumb {
+  background: #4b5563; 
+  border-radius: 4px;
+}
+.logs-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6b7280; 
+}

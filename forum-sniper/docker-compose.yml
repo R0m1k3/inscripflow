@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  browserless:
+    image: ghcr.io/browserless/chromium:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - TIMEOUT=60000
+    restart: unless-stopped
+    networks:
+      - sniper-net
+
+  backend:
+    build: ./server
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+    environment:
+      - BROWSERLESS_HOST=browserless
+      - PORT=4000
+    depends_on:
+      - browserless
+    networks:
+      - sniper-net
+    command: npm run dev
+
+  frontend:
+    build: ./client
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./client:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:4000
+    depends_on:
+      - backend
+    networks:
+      - sniper-net
+    command: npm run dev
+
+networks:
+  sniper-net:
+    driver: bridge
