@@ -18,7 +18,21 @@ export async function checkTarget(target, logCallback) {
         await page.goto(target.url, { timeout: 30000, waitUntil: 'domcontentloaded' });
 
         // Heuristic Check: Search for "Register" related forms
-        // 1. Check for "Closed" keywords
+        // 0. LINK DISCOVERY: If this looks like a login page (no many inputs) or just a landing page, try to find a "Register" link.
+        const passwordInputsBefore = await page.locator('input[type="password"]').count();
+        if (passwordInputsBefore === 0 || (await page.locator('input[type="email"]').count()) === 0) {
+            logCallback(`No obvious form found. Searching for 'Register' link...`);
+            const registerLink = page.locator('a', { hasText: /register|sign up|inscription|créer.*compte|join/i }).first();
+            if (await registerLink.count() > 0) {
+                const linkText = await registerLink.innerText();
+                logCallback(`Found link: "${linkText}". Clicking...`);
+                await registerLink.click();
+                await page.waitForLoadState('domcontentloaded');
+                await page.waitForTimeout(2000); // Wait for potential modals or transitions
+            }
+        }
+
+        // 1. Check for "Closed" keywords (AFTER potential navigation)
         const bodyText = await page.innerText('body');
         if (bodyText.match(/registration.*closed/i) || bodyText.match(/inscriptions.*fermées/i)) {
             await browser.close();
