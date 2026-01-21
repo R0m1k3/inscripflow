@@ -151,9 +151,42 @@ export async function analyzeUrl(url, progressCallback) {
         const bodyText = await page.innerText('body').catch(() => '');
 
         // 4. Detect forum type
+        // 4. Detect forum type
         progressCallback('Analyzing forum type...');
         const forumInfo = detectForumType(html);
         report.forumType = forumInfo?.name || 'Unknown';
+
+        // Fallback: Generic Technology & Semantic Detection
+        if (report.forumType === 'Unknown') {
+            const techStack = [];
+            const lowerHtml = html.toLowerCase();
+
+            // Frameworks/CMS
+            if (lowerHtml.includes('wp-content')) techStack.push('WordPress');
+            if (lowerHtml.includes('joomla')) techStack.push('Joomla');
+            if (lowerHtml.includes('drupal')) techStack.push('Drupal');
+            if (lowerHtml.includes('bootstrap')) techStack.push('Bootstrap');
+            if (lowerHtml.includes('tailwind')) techStack.push('Tailwind');
+            if (lowerHtml.includes('jquery')) techStack.push('jQuery');
+            if (lowerHtml.includes('react')) techStack.push('React');
+            if (lowerHtml.includes('vue')) techStack.push('Vue');
+            if (lowerHtml.includes('laravel')) techStack.push('Laravel');
+
+            // Site Categories
+            const lowerBody = bodyText.toLowerCase();
+            const siteTypes = [];
+            if (lowerBody.match(/torrent|tracker|seed|leech|peers/)) siteTypes.push('Torrent Tracker');
+            if (lowerBody.match(/board|topic|thread|post|community/)) siteTypes.push('Forum Board');
+            if (lowerBody.match(/blog|article|comment/)) siteTypes.push('Blog');
+            if (lowerBody.match(/shop|store|cart|product/)) siteTypes.push('E-Commerce');
+
+            if (techStack.length > 0 || siteTypes.length > 0) {
+                const techStr = techStack.length > 0 ? `Tech: ${techStack.join('/')}` : '';
+                const typeStr = siteTypes.length > 0 ? `Type: ${siteTypes.join('/')}` : '';
+                report.forumType = [typeStr, techStr].filter(Boolean).join(' | ') || 'Custom Site';
+            }
+        }
+
         if (forumInfo) {
             report.registrationPaths = forumInfo.registrationPaths;
         }
