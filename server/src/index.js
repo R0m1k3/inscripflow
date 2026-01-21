@@ -15,8 +15,13 @@ const io = new Server(httpServer, {
   cors: { origin: "*" }
 });
 
+const DATA_DIR = path.resolve('data');
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
 const PORT = process.env.PORT || 4000;
-const DB_FILE = path.resolve('targets.json');
+const DB_FILE = path.join(DATA_DIR, 'targets.json');
 
 app.use(cors());
 app.use(express.json());
@@ -46,7 +51,7 @@ if (fs.existsSync(DB_FILE)) {
 }
 
 // Load Settings (API Key)
-const SETTINGS_FILE = path.resolve('settings.json');
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 let settings = { openRouterKey: '' };
 if (fs.existsSync(SETTINGS_FILE)) {
   try { settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); } catch (e) { }
