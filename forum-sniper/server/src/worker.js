@@ -323,7 +323,14 @@ export async function checkTarget(target, logCallback) {
 
     } catch (error) {
         logCallback(`Browser Error: ${error.message}`);
-        if (browser) await browser.close();
         throw error;
+    } finally {
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error("Error closing browser:", closeError);
+            }
+        }
     }
 }

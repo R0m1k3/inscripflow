@@ -241,8 +241,14 @@ const startScheduler = (initialDelay = null) => {
         try {
           await runTargetCheck(target);
         } catch (targetError) {
-          console.error(`[SCHEDULER] Critical error checking target ${target.id}:`, targetError);
+          console.error(`[SCHEDULER] Critical error checking target ${target.id} (${target.url}):`, targetError);
+          // FORCE ERROR STATUS if not already set, so we don't try again immediately or get stuck
+          updateStatus(target.id, 'ERROR');
+          log(target.id, `System Error: ${targetError.message}`);
         }
+
+        // Brief pause to prevent CPU spiking if loop is tight
+        await new Promise(r => setTimeout(r, 1000));
       }
     } catch (batchError) {
       console.error("[SCHEDULER] Critical error in check batch:", batchError);
