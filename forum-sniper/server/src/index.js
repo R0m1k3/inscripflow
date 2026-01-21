@@ -6,6 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import { checkTarget } from './worker.js';
 import { configureAI } from './aiService.js';
+import { analyzeUrl } from './analyzer.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -91,6 +92,30 @@ app.post('/api/settings', (req, res) => {
 });
 
 app.get('/api/settings', (req, res) => res.json(settings));
+
+// Deep Analysis Endpoint
+app.post('/api/analyze', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'URL required' });
+
+  console.log(`[ANALYZE] Starting deep analysis of ${url}`);
+  const logs = [];
+
+  try {
+    const report = await analyzeUrl(url, (msg) => {
+      console.log(`[ANALYZE] ${msg}`);
+      logs.push(msg);
+      io.emit('analyze_progress', { url, message: msg });
+    });
+
+    report.logs = logs;
+    io.emit('analyze_complete', report);
+    res.json(report);
+  } catch (error) {
+    console.error('[ANALYZE] Error:', error);
+    res.status(500).json({ error: error.message, logs });
+  }
+});
 
 // Socket.io
 io.on('connection', (socket) => {

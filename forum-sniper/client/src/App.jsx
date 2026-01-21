@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
-import { Target, ShieldAlert, CheckCircle, Clock, Plus, Trash2, Terminal, PauseCircle, PlayCircle } from 'lucide-react';
+import { Target, ShieldAlert, CheckCircle, Clock, Plus, Trash2, Terminal, PauseCircle, PlayCircle, Search } from 'lucide-react';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const socket = io(API_URL);
@@ -11,6 +11,11 @@ function App() {
     const [newTarget, setNewTarget] = useState({ url: '', pseudo: '', email: '', password: '' });
     const [showSettings, setShowSettings] = useState(false);
     const [apiKey, setApiKey] = useState('');
+    const [showAnalyze, setShowAnalyze] = useState(false);
+    const [analyzeUrl, setAnalyzeUrl] = useState('');
+    const [analyzing, setAnalyzing] = useState(false);
+    const [analysisResult, setAnalysisResult] = useState(null);
+    const [analysisLogs, setAnalysisLogs] = useState([]);
 
     useEffect(() => {
         if (showSettings) {
@@ -49,6 +54,21 @@ function App() {
             socket.off('status_update');
             socket.off('log_update');
             socket.off('metadata_update');
+        };
+    }, []);
+
+    // Analysis socket listeners
+    useEffect(() => {
+        socket.on('analyze_progress', ({ message }) => {
+            setAnalysisLogs(prev => [...prev, message]);
+        });
+        socket.on('analyze_complete', (report) => {
+            setAnalysisResult(report);
+            setAnalyzing(false);
+        });
+        return () => {
+            socket.off('analyze_progress');
+            socket.off('analyze_complete');
         };
     }, []);
 
@@ -95,6 +115,12 @@ function App() {
                         className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded transition-colors"
                     >
                         <Terminal className="w-4 h-4" /> AI CONFIG
+                    </button>
+                    <button
+                        onClick={() => { setShowAnalyze(true); setAnalysisResult(null); setAnalysisLogs([]); }}
+                        className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded transition-colors"
+                    >
+                        <Search className="w-4 h-4" /> ANALYZE
                     </button>
                     <button
                         onClick={() => setShowAddForm(true)}
@@ -299,6 +325,160 @@ function App() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Analyze Modal */}
+            {showAnalyze && (
+                <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 backdrop-blur-sm overflow-auto">
+                    <div className="bg-gray-900 border border-gray-700 p-6 rounded-lg w-full max-w-3xl shadow-2xl max-h-[90vh] overflow-auto">
+                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                            <Search className="w-5 h-5 text-purple-500" /> Deep Forum Analysis
+                        </h2>
+
+                        {/* URL Input */}
+                        <div className="mb-4">
+                            <label className="block text-xs text-gray-400 mb-1">FORUM URL</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="url"
+                                    placeholder="https://forum.example.com"
+                                    className="flex-1 bg-black border border-gray-700 rounded p-2 focus:border-purple-500 outline-none transition-colors"
+                                    value={analyzeUrl}
+                                    onChange={e => setAnalyzeUrl(e.target.value)}
+                                    disabled={analyzing}
+                                />
+                                <button
+                                    onClick={async () => {
+                                        if (!analyzeUrl) return;
+                                        setAnalyzing(true);
+                                        setAnalysisLogs([]);
+                                        setAnalysisResult(null);
+                                        try {
+                                            const res = await fetch(`${API_URL}/api/analyze`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ url: analyzeUrl })
+                                            });
+                                            const data = await res.json();
+                                            setAnalysisResult(data);
+                                        } catch (e) {
+                                            setAnalysisLogs(prev => [...prev, `Error: ${e.message}`]);
+                                        }
+                                        setAnalyzing(false);
+                                    }}
+                                    disabled={analyzing || !analyzeUrl}
+                                    className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 px-4 py-2 rounded font-bold transition"
+                                >
+                                    {analyzing ? 'ANALYZING...' : 'ANALYZE'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Live Logs */}
+                        {analysisLogs.length > 0 && (
+                            <div className="mb-4 bg-black rounded p-3 max-h-32 overflow-auto font-mono text-xs border border-gray-800">
+                                {analysisLogs.map((log, i) => (
+                                    <div key={i} className="text-green-400">[LOG] {log}</div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Results */}
+                        {analysisResult && (
+                            <div className="space-y-4">
+                                {/* Forum Type */}
+                                <div className="flex items-center gap-3">
+                                    <span className="text-gray-400 text-sm">TYPE:</span>
+                                    <span className="px-3 py-1 bg-purple-600/30 text-purple-300 rounded font-bold">{analysisResult.forumType}</span>
+                                </div>
+
+                                {/* Registration Paths */}
+                                {analysisResult.registrationPaths?.length > 0 && (
+                                    <div>
+                                        <span className="text-gray-400 text-sm block mb-2">REGISTRATION PATHS:</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {analysisResult.registrationPaths.map((p, i) => (
+                                                <a key={i} href={new URL(p, analysisResult.url).href} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-green-600/20 text-green-400 rounded text-xs hover:bg-green-600/40">{p}</a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Invitation Codes */}
+                                {analysisResult.invitationCodes?.length > 0 && (
+                                    <div>
+                                        <span className="text-gray-400 text-sm block mb-2">INVITATION CODES FOUND:</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {analysisResult.invitationCodes.map((c, i) => (
+                                                <span key={i} className="px-2 py-1 bg-yellow-600/30 text-yellow-300 rounded text-xs font-mono">{c}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Links Found */}
+                                {analysisResult.allLinks?.length > 0 && (
+                                    <div>
+                                        <span className="text-gray-400 text-sm block mb-2">RELEVANT LINKS:</span>
+                                        <div className="bg-black/50 rounded p-2 max-h-40 overflow-auto">
+                                            {analysisResult.allLinks.map((l, i) => (
+                                                <div key={i} className="text-xs py-1 border-b border-gray-800 last:border-0">
+                                                    <a href={l.href} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">{l.text || l.href}</a>
+                                                    <span className="text-gray-600 ml-2">{l.href}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Form Fields */}
+                                {analysisResult.formFields?.length > 0 && (
+                                    <div>
+                                        <span className="text-gray-400 text-sm block mb-2">FORM FIELDS DETECTED:</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {analysisResult.formFields.map((f, i) => (
+                                                <span key={i} className={`px-2 py-1 rounded text-xs ${f.name.match(/invite|code|referral/i) ? 'bg-yellow-600/30 text-yellow-300' : 'bg-gray-700 text-gray-300'}`}>
+                                                    {f.name} ({f.type}){f.required && ' *'}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Notes */}
+                                {analysisResult.notes?.length > 0 && (
+                                    <div className="bg-orange-900/20 border border-orange-900 p-3 rounded">
+                                        {analysisResult.notes.map((n, i) => (
+                                            <div key={i} className="text-orange-300 text-sm">{n}</div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* Robots.txt */}
+                                {analysisResult.robotsTxtInfo?.hints?.length > 0 && (
+                                    <div>
+                                        <span className="text-gray-400 text-sm block mb-2">ROBOTS.TXT HINTS:</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {analysisResult.robotsTxtInfo.hints.map((h, i) => (
+                                                <span key={i} className="px-2 py-1 bg-cyan-600/20 text-cyan-400 rounded text-xs">{h}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Close Button */}
+                        <div className="flex justify-end mt-6">
+                            <button
+                                onClick={() => setShowAnalyze(false)}
+                                className="px-4 py-2 hover:bg-gray-800 rounded transition"
+                            >
+                                CLOSE
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
