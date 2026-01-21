@@ -388,11 +388,33 @@ function App() {
                         {/* Results */}
                         {analysisResult && (
                             <div className="space-y-4">
+                                {/* Page Title & Description */}
+                                {analysisResult.pageTitle && (
+                                    <div className="bg-gray-800/50 p-3 rounded">
+                                        <div className="text-lg font-bold text-white">{analysisResult.pageTitle}</div>
+                                        {analysisResult.pageDescription && (
+                                            <div className="text-xs text-gray-400 mt-1">{analysisResult.pageDescription}</div>
+                                        )}
+                                    </div>
+                                )}
+
                                 {/* Forum Type */}
                                 <div className="flex items-center gap-3">
                                     <span className="text-gray-400 text-sm">TYPE:</span>
                                     <span className="px-3 py-1 bg-purple-600/30 text-purple-300 rounded font-bold">{analysisResult.forumType}</span>
                                 </div>
+
+                                {/* Social Links */}
+                                {analysisResult.socialLinks?.length > 0 && (
+                                    <div>
+                                        <span className="text-gray-400 text-sm block mb-2">💬 SOCIAL / INVITE LINKS:</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {analysisResult.socialLinks.map((l, i) => (
+                                                <a key={i} href={l.href} target="_blank" rel="noopener noreferrer" className="px-2 py-1 bg-indigo-600/30 text-indigo-300 rounded text-xs hover:bg-indigo-600/50">{l.text || l.href}</a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Registration Paths */}
                                 {analysisResult.registrationPaths?.length > 0 && (

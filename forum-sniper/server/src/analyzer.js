@@ -159,19 +159,70 @@ export async function analyzeUrl(url, progressCallback) {
         }
         progressCallback(`Forum type: ${report.forumType}`);
 
-        // 5. Extract all relevant links
-        progressCallback('Scanning for registration links...');
-        const links = await page.evaluate(() => {
-            return Array.from(document.querySelectorAll('a[href]')).map(a => ({
+        // 5. Extract ALL page information
+        progressCallback('Scanning page structure...');
+        const pageInfo = await page.evaluate(() => {
+            // Get all links
+            const allLinks = Array.from(document.querySelectorAll('a[href]')).map(a => ({
+                text: a.innerText.trim().slice(0, 100),
+                href: a.href
+            })).filter(l => l.text || l.href);
+
+            // Filter relevant links (register, invite, signup, etc.)
+            const relevantLinks = allLinks.filter(l =>
+                l.href.match(/register|signup|invite|join|inscription|créer|account|login|auth/i) ||
+                l.text.match(/register|signup|invite|join|inscription|créer|s'inscrire|compte|connexion|login/i)
+            );
+
+            // Get page metadata
+            const title = document.title;
+            const description = document.querySelector('meta[name="description"]')?.content || '';
+            const generator = document.querySelector('meta[name="generator"]')?.content || '';
+
+            // Get navigation items
+            const navItems = Array.from(document.querySelectorAll('nav a, header a, [role="navigation"] a')).map(a => ({
                 text: a.innerText.trim().slice(0, 50),
                 href: a.href
-            })).filter(l =>
-                l.href.match(/register|signup|invite|join|inscription|créer/i) ||
-                l.text.match(/register|signup|invite|join|inscription|créer|s'inscrire/i)
-            );
+            })).slice(0, 30);
+
+            // Get all buttons
+            const buttons = Array.from(document.querySelectorAll('button, [role="button"], input[type="submit"]')).map(b => ({
+                text: b.innerText?.trim() || b.value || '',
+                type: b.tagName.toLowerCase()
+            })).filter(b => b.text).slice(0, 20);
+
+            // Check for Discord/Telegram invite links
+            const socialLinks = allLinks.filter(l =>
+                l.href.match(/discord\.gg|t\.me|telegram|twitter\.com|x\.com/i)
+            ).slice(0, 10);
+
+            // Check for closed/invite-only indications
+            const bodyText = document.body.innerText.toLowerCase();
+            const pageClues = {
+                isClosed: bodyText.includes('closed') || bodyText.includes('fermé') || bodyText.includes('fermée'),
+                isInviteOnly: bodyText.includes('invite only') || bodyText.includes('invitation') || bodyText.includes('parrainage'),
+                hasDiscord: !!document.querySelector('a[href*="discord"]'),
+                hasTelegram: !!document.querySelector('a[href*="t.me"], a[href*="telegram"]')
+            };
+
+            return { allLinks, relevantLinks, title, description, generator, navItems, buttons, socialLinks, pageClues };
         });
-        report.allLinks = links.slice(0, 20);
-        progressCallback(`Found ${links.length} relevant links`);
+
+        // Store comprehensive info
+        report.pageTitle = pageInfo.title;
+        report.pageDescription = pageInfo.description;
+        if (pageInfo.generator) report.notes.push(`🔧 Generator: ${pageInfo.generator}`);
+        report.allLinks = pageInfo.relevantLinks.slice(0, 20);
+        report.navItems = pageInfo.navItems;
+        report.buttons = pageInfo.buttons;
+        report.socialLinks = pageInfo.socialLinks;
+
+        if (pageInfo.pageClues.isClosed) report.notes.push('🔒 Page mentions "closed/fermé"');
+        if (pageInfo.pageClues.isInviteOnly) report.notes.push('🔑 Page mentions invitation/parrainage');
+        if (pageInfo.pageClues.hasDiscord) report.notes.push('💬 Discord link found');
+        if (pageInfo.pageClues.hasTelegram) report.notes.push('📱 Telegram link found');
+
+        progressCallback(`Found ${pageInfo.relevantLinks.length} relevant links, ${pageInfo.navItems.length} nav items, ${pageInfo.buttons.length} buttons`);
 
         // 6. Extract invitation codes from current page
         progressCallback('Searching for invitation codes...');
