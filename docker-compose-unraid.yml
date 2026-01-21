@@ -1,5 +1,6 @@
-# NOTE: Do not run this from /boot (USB drive). Move to /mnt/user/appdata/forum-sniper
-# Version 3.8 is implied/obsolete in newer compose
+# NOTE: This file is optimized for Unraid USB Sticks.
+# It DOES NOT build images. It downloads Node.js and installs dependencies at runtime.
+# This prevents permission errors on /boot.
 
 services:
   browserless:
@@ -10,23 +11,21 @@ services:
       - "3000:3000"
     environment:
       - TIMEOUT=60000
-      - CONCURRENT=10
     networks:
       - unraid_sniper_net
 
   backend:
+    image: node:18-alpine
     container_name: forum_backend
-    build:
-      context: ./server
-      dockerfile: Dockerfile
+    working_dir: /app
     restart: unless-stopped
     ports:
       - "4000:4000"
     volumes:
-      # Mount the entire server directory to persistent storage if needed, 
-      # or just specific config files. For Unraid, mapping the config files is best.
-      - ./server/targets.json:/app/targets.json
-      - ./server/settings.json:/app/settings.json
+      # Map source code
+      - ./server:/app
+      # PERSISTENT named volume for node_modules (Crucial for performance/USB health)
+      - backend_node_modules:/app/node_modules
     environment:
       - BROWSERLESS_HOST=browserless
       - PORT=4000
@@ -34,27 +33,32 @@ services:
       - browserless
     networks:
       - unraid_sniper_net
-    # Use production start to avoid nodemon overhead in "prod"
-    command: npm start
+    # Install deps on start, then run
+    command: /bin/sh -c "npm install && npm start"
 
   frontend:
+    image: node:18-alpine
     container_name: forum_frontend
-    build:
-      context: ./client
-      dockerfile: Dockerfile
+    working_dir: /app
     restart: unless-stopped
     ports:
       - "5173:5173"
+    volumes:
+      - ./client:/app
+      # PERSISTENT named volume for node_modules
+      - frontend_node_modules:/app/node_modules
     environment:
-      # Ensure this points to the Unraid IP or rely on internal if using reverse proxy.
-      # For direct access, this needs to be the browser-accessible URL.
-      # Valid strategy: Client side browser needs to hit API.
+      # REPLACE WITH YOUR UNRAID IP IF NEEDED
       - VITE_API_URL=http://192.168.1.16:4000
     networks:
       - unraid_sniper_net
-    # Vite dev server with host 0.0.0.0 is often easiest for home server use without Nginx
-    command: npm run dev -- --host
+    # Install deps on start, then run dev
+    command: /bin/sh -c "npm install && npm run dev -- --host"
 
 networks:
   unraid_sniper_net:
     driver: bridge
+
+volumes:
+  backend_node_modules:
+  frontend_node_modules:
