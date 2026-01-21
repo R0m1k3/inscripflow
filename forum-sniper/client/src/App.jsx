@@ -72,6 +72,7 @@ function App() {
         switch (status) {
             case 'REGISTERED': return 'text-green-400 border-green-400 bg-green-400/10';
             case 'OPEN': return 'text-orange-400 border-orange-400 bg-orange-400/10';
+            case 'NEEDS_INVITE': return 'text-yellow-400 border-yellow-400 bg-yellow-400/10';
             case 'CHECKING': return 'text-blue-400 border-blue-400 bg-blue-400/10';
             case 'ERROR': return 'text-red-400 border-red-400 bg-red-400/10';
             default: return 'text-gray-400 border-gray-600 bg-gray-800';

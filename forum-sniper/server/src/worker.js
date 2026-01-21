@@ -221,8 +221,16 @@ export async function checkTarget(target, logCallback) {
             // Submit
             const submitBtn = page.locator('button[type="submit"], input[type="submit"]').first();
             if (await submitBtn.count() > 0) {
+                // Check if button is disabled (likely needs invitation code)
+                const isDisabled = await submitBtn.evaluate(el => el.disabled || el.hasAttribute('disabled'));
+                if (isDisabled) {
+                    logCallback(`Submit button is DISABLED. Likely needs invitation code or additional fields.`);
+                    await browser.close();
+                    return { success: false, open: true, needsInvite: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
+                }
+
                 logCallback(`Clicking submit...`);
-                await submitBtn.click();
+                await submitBtn.click({ timeout: 10000 });
                 await page.waitForTimeout(5000); // Wait for navigation
 
                 // Check success URL or message

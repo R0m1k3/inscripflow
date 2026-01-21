@@ -149,6 +149,9 @@ const runTargetCheck = async (target) => {
     if (result.success) {
       updateStatus(target.id, 'REGISTERED');
       log(target.id, 'SUCCESS: Registration completed!');
+    } else if (result.needsInvite) {
+      updateStatus(target.id, 'NEEDS_INVITE');
+      log(target.id, 'OPEN but requires invitation code or additional info.');
     } else if (result.open) {
       updateStatus(target.id, 'OPEN');
       log(target.id, 'WARNING: Registration seems open but failed to automate.');
