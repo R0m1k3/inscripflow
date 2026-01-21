@@ -99,7 +99,44 @@ function extractInvitationCodes(text, url) {
         }
     }
 
-    return codes;
+    const STOPWORDS = ['pour', 'code', 'invite', 'data', 'json', 'home', 'return', 'true', 'false', 'null', 'undefined', 'search', 'login'];
+    const filteredCodes = [...new Set(codes)].filter(c =>
+        !STOPWORDS.includes(c.toLowerCase()) &&
+        c.length > 2 &&
+        !c.match(/^\d+$/) // Ignore pure numbers unlikely to be complex invite codes
+    );
+
+    return filteredCodes;
+}
+
+/**
+ * Perform intelligence search for invitation codes
+ */
+async function performIntelligence(domain, forumName) {
+    const results = [];
+
+    // 1. Reddit OpenSignups
+    results.push({
+        source: 'Reddit r/OpenSignups',
+        url: `https://www.reddit.com/r/OpenSignups/search/?q=${encodeURIComponent(domain)}&restrict_sr=1&sort=new`,
+        description: `Check for open signup posts for ${domain}`
+    });
+
+    // 2. Twitter Search
+    results.push({
+        source: 'Twitter / X',
+        url: `https://twitter.com/search?q=${encodeURIComponent(domain + ' invitation code')}&f=live`,
+        description: `Real-time tweets for ${domain} invites`
+    });
+
+    // 3. Opentrackers.org (Review site)
+    results.push({
+        source: 'Opentrackers Reviews',
+        url: `https://opentrackers.org/?s=${encodeURIComponent(domain)}`,
+        description: `Check tracker status and invite availability`
+    });
+
+    return results;
 }
 
 /**
@@ -345,6 +382,15 @@ export async function analyzeUrl(url, progressCallback) {
     } catch (error) {
         report.notes.push(`Error: ${error.message}`);
         if (browser) await browser.close();
+    }
+
+    // 8. Intelligence / Web Research
+    progressCallback('Gathering invitation intelligence...');
+    try {
+        const domain = new URL(url).hostname.replace('www.', '');
+        report.intelligence = await performIntelligence(domain, report.pageTitle || domain);
+    } catch (e) {
+        // Ignore intelligence errors
     }
 
     progressCallback('Analysis complete!');

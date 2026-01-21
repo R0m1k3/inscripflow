@@ -469,6 +469,24 @@ function App() {
                                     </div>
                                 )}
 
+                                {/* Intelligence Search */}
+                                {analysisResult.intelligence?.length > 0 && (
+                                    <div>
+                                        <span className="text-gray-400 text-sm block mb-2">🕵️‍♂️ INTELLIGENCE / RESEARCH:</span>
+                                        <div className="bg-indigo-900/10 border border-indigo-900/30 p-3 rounded space-y-2">
+                                            {analysisResult.intelligence.map((item, i) => (
+                                                <a key={i} href={item.url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-2 bg-black/40 hover:bg-black/60 rounded transition group">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-indigo-300 font-bold text-xs">{item.source}</span>
+                                                        <span className="text-gray-400 text-xs">{item.description}</span>
+                                                    </div>
+                                                    <span className="text-gray-500 text-xs group-hover:text-indigo-400">OPEN ↗</span>
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Notes */}
                                 {analysisResult.notes?.length > 0 && (
                                     <div className="bg-orange-900/20 border border-orange-900 p-3 rounded">
