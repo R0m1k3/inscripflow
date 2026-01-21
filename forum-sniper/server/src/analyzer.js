@@ -142,7 +142,13 @@ async function performIntelligence(domain, forumName) {
 /**
  * Perform deep analysis of a forum URL
  */
-export async function analyzeUrl(url, progressCallback) {
+export async function analyzeUrl(inputUrl, progressCallback) {
+    // Ensure URL has protocol
+    let url = inputUrl;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://' + url;
+    }
+
     const report = {
         url,
         forumType: null,
