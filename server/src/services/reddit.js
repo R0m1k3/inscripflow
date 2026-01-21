@@ -21,6 +21,20 @@ const USER_AGENTS = [
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1'
 ];
 
+// Statistics State
+const stats = {
+    checkCount: 0,
+    lastCheck: null,
+    history: [] // { timestamp, title, url, status: 'ADDED' | 'IGNORED_KEYWORD' | 'IGNORED_DOMAIN' | 'ERROR' }
+};
+
+const addToHistory = (entry) => {
+    stats.history.unshift({ ...entry, timestamp: new Date() });
+    if (stats.history.length > 50) stats.history.pop();
+};
+
+export const getRedditStats = () => stats;
+
 const processedPosts = new Set();
 
 const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
@@ -34,6 +48,9 @@ export const startRedditMonitor = (addTargetCallback, logCallback) => {
 
     const checkReddit = async () => {
         let nextRun = getJitteredInterval();
+        stats.checkCount++;
+        stats.lastCheck = new Date();
+
         try {
             logCallback(`Checking r/FrancePirate... (Next check in ~${Math.round(nextRun / 60000)}m)`);
 
@@ -75,19 +92,30 @@ export const startRedditMonitor = (addTargetCallback, logCallback) => {
 
                 const content = `${title} ${selftext} ${url}`;
 
-                if (!KEYWORDS_REGEX.test(content)) continue;
+                if (!KEYWORDS_REGEX.test(content)) {
+                    // addToHistory({ title, url, status: 'IGNORED_NO_KEYWORD' }); // Too noisy to log every post
+                    continue;
+                }
 
                 const urls = content.match(URL_REGEX) || [];
 
                 for (const foundUrl of urls) {
                     try {
                         const urlObj = new URL(foundUrl);
-                        if (IGNORED_DOMAINS.some(d => urlObj.hostname.includes(d))) continue;
+                        if (IGNORED_DOMAINS.some(d => urlObj.hostname.includes(d))) {
+                            addToHistory({ title, url: foundUrl, status: 'IGNORED_DOMAIN' });
+                            continue;
+                        }
 
                         logCallback(`[STEALTH] Found candidate: ${foundUrl}`);
 
                         const added = addTargetCallback(foundUrl, 'REDDIT_STEALTH');
-                        if (added) newCount++;
+                        if (added) {
+                            newCount++;
+                            addToHistory({ title, url: foundUrl, status: 'ADDED' });
+                        } else {
+                            addToHistory({ title, url: foundUrl, status: 'DUPLICATE' });
+                        }
                     } catch (e) { }
                 }
             }
@@ -101,6 +129,7 @@ export const startRedditMonitor = (addTargetCallback, logCallback) => {
 
         } catch (error) {
             logCallback(`Stealth Monitor Error: ${error.message}`);
+            addToHistory({ title: 'System Error', url: '', status: 'ERROR', details: error.message });
         } finally {
             setTimeout(checkReddit, nextRun);
         }

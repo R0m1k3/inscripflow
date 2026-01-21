@@ -7,7 +7,7 @@ import path from 'path';
 import { checkTarget } from './worker.js';
 import { configureAI } from './aiService.js';
 import { analyzeUrl } from './analyzer.js';
-import { startRedditMonitor } from './services/reddit.js';
+import { startRedditMonitor, getRedditStats } from './services/reddit.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -93,6 +93,8 @@ app.post('/api/settings', (req, res) => {
 });
 
 app.get('/api/settings', (req, res) => res.json(settings));
+
+app.get('/api/reddit', (req, res) => res.json(getRedditStats()));
 
 // Deep Analysis Endpoint
 app.post('/api/analyze', async (req, res) => {
@@ -282,9 +284,13 @@ startRedditMonitor((url, source) => {
   targets.push(newTarget);
   saveTargets();
   io.emit('targets_updated', targets);
+  io.emit('reddit_stats', getRedditStats());
   console.log(`[REDDIT] Added new target: ${url}`);
   return true;
-}, (msg) => console.log(`[REDDIT] ${msg}`));
+}, (msg) => {
+  console.log(`[REDDIT] ${msg}`);
+  io.emit('reddit_stats', getRedditStats());
+});
 
 httpServer.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
