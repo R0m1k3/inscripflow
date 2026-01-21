@@ -1,39 +1,64 @@
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 const SUBREDDIT_URL = 'https://www.reddit.com/r/FrancePirate/new.json?limit=25';
-const POLL_INTERVAL = 15 * 60 * 1000; // 15 Minutes
+const BASE_INTERVAL = 15 * 60 * 1000; // 15 Minutes
 const KEYWORDS_REGEX = /(ouvert|invitation|code|regist|s'inscrire|open|sign\s*up)/i;
-const URL_REGEX = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
+const URL_REGEX = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%._\+.~#?&//=]*)/g;
 
-// List of ignored domains (common non-forum links found on Reddit)
+// List of ignored domains
 const IGNORED_DOMAINS = [
     'reddit.com', 'redd.it', 'imgur.com', 'gyazo.com', 'youtube.com', 'youtu.be',
     'discord.gg', 'discord.com', 't.me', 'twitter.com', 'x.com', 'facebook.com',
-    'pinterest.com', 'google.com', 'yggtorrent.li', 'sharewood.tv' // Add known huge trackers that might be mentioned but are not "new"
+    'pinterest.com', 'google.com', 'yggtorrent.li', 'sharewood.tv'
 ];
 
-// Set of processed post IDs to avoid processing same post twice in a session
-// In production with restart persistence, this should be in a DB, but memory is fine for now
+// Stealth User Agents
+const USER_AGENTS = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/50 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1'
+];
+
 const processedPosts = new Set();
 
-/**
- * Starts the Reddit monitoring loop.
- * @param {Function} addTargetCallback - Function (url) => boolean (returns true if added, false if exists)
- * @param {Function} logCallback - Function (msg) => void
- */
+const getRandomUserAgent = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+const getJitteredInterval = () => {
+    // Randomize interval between 10 and 20 minutes (15 +/- 5)
+    return Math.floor(BASE_INTERVAL + (Math.random() * 600000) - 300000);
+};
+
 export const startRedditMonitor = (addTargetCallback, logCallback) => {
-    logCallback('Starting Reddit Monitor for r/FrancePirate...');
+    logCallback('Starting Stealth Reddit Monitor for r/FrancePirate...');
 
     const checkReddit = async () => {
+        let nextRun = getJitteredInterval();
         try {
-            logCallback('Checking r/FrancePirate for new open forums...');
+            logCallback(`Checking r/FrancePirate... (Next check in ~${Math.round(nextRun / 60000)}m)`);
 
-            const response = await fetch(SUBREDDIT_URL, {
+            const options = {
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (compatible; ForumSniperBot/1.0; +http://localhost)'
+                    'User-Agent': getRandomUserAgent(),
+                    'Accept': 'application/json',
+                    'Accept-Language': 'fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.7'
                 }
-            });
+            };
+
+            // Support Proxy from Environment
+            if (process.env.REDDIT_PROXY) {
+                options.agent = new HttpsProxyAgent(process.env.REDDIT_PROXY);
+                logCallback('Using Proxy for Reddit request.');
+            }
+
+            // @ts-ignore
+            const response = await fetch(SUBREDDIT_URL, options);
 
             if (!response.ok) {
+                if (response.status === 429) {
+                    logCallback('Reddit Rate Limit hit. Backing off for 30 minutes.');
+                    nextRun = 30 * 60 * 1000;
+                }
                 throw new Error(`Reddit API Error: ${response.status} ${response.statusText}`);
             }
 
@@ -48,63 +73,38 @@ export const startRedditMonitor = (addTargetCallback, logCallback) => {
                 if (processedPosts.has(id)) continue;
                 processedPosts.add(id);
 
-                // Combine title and content for search
                 const content = `${title} ${selftext} ${url}`;
 
-                // 1. Keyword Check
-                if (!KEYWORDS_REGEX.test(content)) {
-                    continue;
-                }
+                if (!KEYWORDS_REGEX.test(content)) continue;
 
-                // 2. URL Extraction
                 const urls = content.match(URL_REGEX) || [];
 
                 for (const foundUrl of urls) {
                     try {
                         const urlObj = new URL(foundUrl);
-
-                        // 3. Domain Filter
                         if (IGNORED_DOMAINS.some(d => urlObj.hostname.includes(d))) continue;
 
-                        // 4. FR Check (Heuristic)
-                        // If the post is in r/FrancePirate (which is FR), we assume the context is FR.
-                        // But we can check TLD (.fr) or content language if needed.
-                        // For now, we rely on the subreddit source + manual Review.
-                        // The prompt says "attention le forum doit etre FR".
-                        // We'll trust the subreddit but maybe flag it? 
-                        // We just add it. The filtering will happen in analysis.
+                        logCallback(`[STEALTH] Found candidate: ${foundUrl}`);
 
-                        logCallback(`Found potential candidate: ${foundUrl} in post "${title}"`);
-
-                        const added = addTargetCallback(foundUrl, 'REDDIT_AUTO');
-                        if (added) {
-                            newCount++;
-                            logCallback(`[AUTO-ADD] Added ${foundUrl} to targets.`);
-                        }
-                    } catch (e) {
-                        // Invalid URL in regex match
-                    }
+                        const added = addTargetCallback(foundUrl, 'REDDIT_STEALTH');
+                        if (added) newCount++;
+                    } catch (e) { }
                 }
             }
 
-            if (newCount > 0) {
-                logCallback(`Reddit Scan Complete. Added ${newCount} new targets.`);
-            }
+            if (newCount > 0) logCallback(`Scan Complete. Added ${newCount} targets.`);
 
-            // Cleanup memory (keep last 1000 IDs)
             if (processedPosts.size > 1000) {
                 const it = processedPosts.values();
                 for (let i = 0; i < 200; i++) processedPosts.delete(it.next().value);
             }
 
         } catch (error) {
-            logCallback(`Error checking Reddit: ${error.message}`);
+            logCallback(`Stealth Monitor Error: ${error.message}`);
         } finally {
-            // Schedule next run
-            setTimeout(checkReddit, POLL_INTERVAL);
+            setTimeout(checkReddit, nextRun);
         }
     };
 
-    // Start immediately
     checkReddit();
 };
