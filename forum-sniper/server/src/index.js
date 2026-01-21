@@ -133,14 +133,16 @@ const runTargetCheck = async (target) => {
     ]);
 
     // Update forum metadata if detected
-    if (result.forumType || result.robotsInfo) {
+    if (result.forumType || result.robotsInfo || result.invitationCodes?.length > 0) {
       target.forumType = result.forumType || target.forumType;
       target.robotsInfo = result.robotsInfo || target.robotsInfo;
+      target.invitationCodes = result.invitationCodes || target.invitationCodes;
       saveTargets();
       io.emit('metadata_update', {
         targetId: target.id,
         forumType: target.forumType,
-        robotsInfo: target.robotsInfo
+        robotsInfo: target.robotsInfo,
+        invitationCodes: target.invitationCodes
       });
     }
 

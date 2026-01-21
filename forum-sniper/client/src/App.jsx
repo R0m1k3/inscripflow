@@ -37,8 +37,8 @@ function App() {
         socket.on('log_update', ({ targetId, logEntry }) => {
             setTargets(prev => prev.map(t => t.id === targetId ? { ...t, logs: [logEntry, ...t.logs].slice(0, 50) } : t));
         });
-        socket.on('metadata_update', ({ targetId, forumType, robotsInfo }) => {
-            setTargets(prev => prev.map(t => t.id === targetId ? { ...t, forumType, robotsInfo } : t));
+        socket.on('metadata_update', ({ targetId, forumType, robotsInfo, invitationCodes }) => {
+            setTargets(prev => prev.map(t => t.id === targetId ? { ...t, forumType, robotsInfo, invitationCodes } : t));
         });
 
         // Initial fetch
@@ -137,6 +137,14 @@ function App() {
                                     <span className="text-gray-500">HINTS:</span>
                                     {target.robotsInfo.forumHints.map((hint, i) => (
                                         <span key={i} className="px-1.5 py-0.5 bg-cyan-600/20 text-cyan-400 rounded text-xs">{hint}</span>
+                                    ))}
+                                </div>
+                            )}
+                            {target.invitationCodes?.length > 0 && (
+                                <div className="col-span-2 flex items-center gap-2 flex-wrap">
+                                    <span className="text-gray-500">CODES:</span>
+                                    {target.invitationCodes.map((c, i) => (
+                                        <span key={i} className="px-1.5 py-0.5 bg-yellow-600/30 text-yellow-300 rounded text-xs font-mono" title={`Source: ${c.source}`}>{c.code}</span>
                                     ))}
                                 </div>
                             )}

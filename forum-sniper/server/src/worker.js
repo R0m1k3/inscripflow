@@ -23,13 +23,54 @@ function analyzeRobotsTxt(robotsText) {
     return { forumHints: hints, raw: robotsText.slice(0, 500) };
 }
 
+// Detect invitation codes from URLs and page content
+function detectInvitationCodes(html, url) {
+    const codes = [];
+
+    // Common invitation URL patterns
+    const urlPatterns = [
+        /[?&]invite[_-]?code=([a-zA-Z0-9_-]+)/i,
+        /[?&]ref(?:erral)?=([a-zA-Z0-9_-]+)/i,
+        /[?&]code=([a-zA-Z0-9_-]+)/i,
+        /\/invite\/([a-zA-Z0-9_-]+)/i,
+        /\/register\/([a-zA-Z0-9_-]{6,})/i
+    ];
+
+    // Check URL
+    for (const pattern of urlPatterns) {
+        const match = url.match(pattern);
+        if (match) codes.push({ source: 'url', code: match[1] });
+    }
+
+    // Check HTML for invitation links
+    const htmlPatterns = [
+        /href=["'][^"']*invite[_-]?code=([a-zA-Z0-9_-]+)[^"']*/gi,
+        /href=["'][^"']*\/invite\/([a-zA-Z0-9_-]+)[^"']*/gi,
+        /invitation.*?code.*?["'>:]\s*([A-Z0-9]{4,20})/gi,
+        /code\s*d['']?invitation.*?["'>:]\s*([A-Z0-9]{4,20})/gi
+    ];
+
+    for (const pattern of htmlPatterns) {
+        let match;
+        while ((match = pattern.exec(html)) !== null) {
+            if (match[1] && !codes.find(c => c.code === match[1])) {
+                codes.push({ source: 'page', code: match[1] });
+            }
+        }
+    }
+
+    return codes;
+}
+
+
 
 export async function checkTarget(target, logCallback) {
     logCallback(`Connecting to Browserless at ${BROWSERLESS_URL}...`);
 
     let browser;
-    let detectedForumType = null;
+    let detectedForumType = 'Unknown';
     let robotsTxtInfo = null;
+    let invitationCodes = [];
 
     try {
         browser = await chromium.connectOverCDP(BROWSERLESS_URL);
@@ -83,6 +124,7 @@ export async function checkTarget(target, logCallback) {
                 }
             }
         } else {
+            detectedForumType = 'Unknown';
             logCallback(`Forum type not recognized. Using generic detection...`);
 
             // Try common registration paths if fingerprint failed
@@ -120,11 +162,19 @@ export async function checkTarget(target, logCallback) {
         }
 
 
+        // STEP 2: DETECT INVITATION CODES
+        const currentHtml = await page.content();
+        const currentUrl = page.url();
+        invitationCodes = detectInvitationCodes(currentHtml, currentUrl);
+        if (invitationCodes.length > 0) {
+            logCallback(`Found ${invitationCodes.length} invitation code(s): ${invitationCodes.map(c => c.code).join(', ')}`);
+        }
+
         // 1. Check for "Closed" keywords (AFTER potential navigation)
         const bodyText = await page.innerText('body');
         if (bodyText.match(/registration.*closed/i) || bodyText.match(/inscriptions.*fermées/i)) {
             await browser.close();
-            return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
+            return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
         }
 
         // 2. Search for Inputs
@@ -165,7 +215,7 @@ export async function checkTarget(target, logCallback) {
             if (hasCaptcha) {
                 logCallback(`CAPTCHA DETECTED! Cannot solve automatically in MVP.`);
                 await browser.close();
-                return { success: false, open: true, captcha: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
+                return { success: false, open: true, captcha: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
             }
 
             // Submit
@@ -180,12 +230,12 @@ export async function checkTarget(target, logCallback) {
                 const newBody = await page.innerText('body');
                 if (newBody.match(/welcome/i) || newBody.match(/bienvenue/i) || newBody.match(/success/i) || newBody.match(/activate/i)) {
                     await browser.close();
-                    return { success: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
+                    return { success: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
                 }
             }
 
             await browser.close();
-            return { success: false, open: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo }; // Open but failed/unknown result
+            return { success: false, open: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes }; // Open but failed/unknown result
         }
 
         // If Heuristics failed to find enough fields, OR if we want to force AI check for complex Q&A
@@ -232,7 +282,7 @@ export async function checkTarget(target, logCallback) {
                     const newBody = await page.innerText('body');
                     if (newBody.match(/welcome/i) || newBody.match(/bienvenue/i) || newBody.match(/success/i)) {
                         await browser.close();
-                        return { success: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
+                        return { success: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
                     }
                 }
 
@@ -243,7 +293,7 @@ export async function checkTarget(target, logCallback) {
 
         logCallback(`No successful registration path found.`);
         await browser.close();
-        return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
+        return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
 
     } catch (error) {
         logCallback(`Browser Error: ${error.message}`);
