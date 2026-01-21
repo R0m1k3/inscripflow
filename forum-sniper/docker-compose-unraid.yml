@@ -1,4 +1,5 @@
-version: '3.8'
+# NOTE: Do not run this from /boot (USB drive). Move to /mnt/user/appdata/forum-sniper
+# Version 3.8 is implied/obsolete in newer compose
 
 services:
   browserless:
@@ -48,7 +49,7 @@ services:
       # Ensure this points to the Unraid IP or rely on internal if using reverse proxy.
       # For direct access, this needs to be the browser-accessible URL.
       # Valid strategy: Client side browser needs to hit API.
-      - VITE_API_URL=http://YOUR_UNRAID_IP:4000
+      - VITE_API_URL=http://192.168.1.16:4000
     networks:
       - unraid_sniper_net
     # Vite dev server with host 0.0.0.0 is often easiest for home server use without Nginx
