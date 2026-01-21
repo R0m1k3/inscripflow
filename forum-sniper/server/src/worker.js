@@ -1,24 +1,111 @@
 import { chromium } from 'playwright-core';
 import { getAIFormFillData } from './aiService.js';
+import { detectForumType, getCommonRegistrationPaths, buildRegistrationUrls } from './forumFingerprints.js';
 
 const BROWSERLESS_URL = process.env.BROWSERLESS_HOST
     ? `ws://${process.env.BROWSERLESS_HOST}:3000`
     : 'ws://localhost:3000';
 
+// Analyze robots.txt for forum hints
+function analyzeRobotsTxt(robotsText) {
+    const hints = [];
+    const lines = robotsText.toLowerCase();
+
+    if (lines.includes('phpbb')) hints.push('phpBB');
+    if (lines.includes('xenforo')) hints.push('XenForo');
+    if (lines.includes('discourse')) hints.push('Discourse');
+    if (lines.includes('invision') || lines.includes('ips4')) hints.push('Invision');
+    if (lines.includes('vbulletin')) hints.push('vBulletin');
+    if (lines.includes('mybb')) hints.push('MyBB');
+    if (lines.includes('wp-content')) hints.push('WordPress');
+    if (lines.includes('register.php') || lines.includes('signup')) hints.push('Has Registration');
+
+    return { forumHints: hints, raw: robotsText.slice(0, 500) };
+}
+
+
 export async function checkTarget(target, logCallback) {
     logCallback(`Connecting to Browserless at ${BROWSERLESS_URL}...`);
 
     let browser;
+    let detectedForumType = null;
+    let robotsTxtInfo = null;
+
     try {
         browser = await chromium.connectOverCDP(BROWSERLESS_URL);
         const context = await browser.newContext();
         const page = await context.newPage();
 
+        // STEP 0: Fetch robots.txt for clues
+        try {
+            const robotsUrl = new URL('/robots.txt', target.url).href;
+            const robotsResponse = await fetch(robotsUrl, { signal: AbortSignal.timeout(5000) });
+            if (robotsResponse.ok) {
+                const robotsText = await robotsResponse.text();
+                robotsTxtInfo = analyzeRobotsTxt(robotsText);
+                if (robotsTxtInfo.forumHints.length > 0) {
+                    logCallback(`robots.txt hints: ${robotsTxtInfo.forumHints.join(', ')}`);
+                }
+            }
+        } catch (e) {
+            // robots.txt not available or timeout
+        }
+
         logCallback(`Navigating to ${target.url}...`);
         await page.goto(target.url, { timeout: 30000, waitUntil: 'domcontentloaded' });
 
-        // Heuristic Check: Search for "Register" related forms
-        // 0. LINK DISCOVERY: If this looks like a login page (no many inputs) or just a landing page, try to find a "Register" link.
+        // STEP 1: FORUM FINGERPRINTING
+        const initialHtml = await page.content();
+        const forumInfo = detectForumType(initialHtml);
+
+        if (forumInfo) {
+            detectedForumType = forumInfo.name;
+            logCallback(`Detected forum type: ${forumInfo.name}`);
+
+            // Try known registration paths for this forum type
+            for (const regPath of forumInfo.registrationPaths) {
+                try {
+                    const regUrl = new URL(regPath, target.url).href;
+                    logCallback(`Trying known path: ${regUrl}`);
+
+                    const response = await page.goto(regUrl, { timeout: 15000, waitUntil: 'domcontentloaded' });
+
+                    if (response && response.ok()) {
+                        // Check if this looks like a registration page
+                        const regHtml = await page.content();
+                        if (regHtml.match(/password|email|username|inscription|register/i)) {
+                            logCallback(`Found registration page at ${regUrl}`);
+                            break; // Stay on this page
+                        }
+                    }
+                } catch (e) {
+                    logCallback(`Path ${regPath} failed: ${e.message}`);
+                }
+            }
+        } else {
+            logCallback(`Forum type not recognized. Using generic detection...`);
+
+            // Try common registration paths if fingerprint failed
+            const commonPaths = getCommonRegistrationPaths().slice(0, 5); // Try first 5
+            for (const regPath of commonPaths) {
+                try {
+                    const regUrl = new URL(regPath, target.url).href;
+                    const response = await page.goto(regUrl, { timeout: 10000, waitUntil: 'domcontentloaded' });
+
+                    if (response && response.ok()) {
+                        const regHtml = await page.content();
+                        if (regHtml.match(/password|email|username|inscription|register/i)) {
+                            logCallback(`Found registration at common path: ${regUrl}`);
+                            break;
+                        }
+                    }
+                } catch (e) {
+                    // Silently continue to next path
+                }
+            }
+        }
+
+        // STEP 1: LINK DISCOVERY (existing logic, now as fallback)
         const passwordInputsBefore = await page.locator('input[type="password"]').count();
         if (passwordInputsBefore === 0 || (await page.locator('input[type="email"]').count()) === 0) {
             logCallback(`No obvious form found. Searching for 'Register' link...`);
@@ -32,11 +119,12 @@ export async function checkTarget(target, logCallback) {
             }
         }
 
+
         // 1. Check for "Closed" keywords (AFTER potential navigation)
         const bodyText = await page.innerText('body');
         if (bodyText.match(/registration.*closed/i) || bodyText.match(/inscriptions.*fermées/i)) {
             await browser.close();
-            return { success: false, open: false };
+            return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
         }
 
         // 2. Search for Inputs
@@ -77,7 +165,7 @@ export async function checkTarget(target, logCallback) {
             if (hasCaptcha) {
                 logCallback(`CAPTCHA DETECTED! Cannot solve automatically in MVP.`);
                 await browser.close();
-                return { success: false, open: true, captcha: true };
+                return { success: false, open: true, captcha: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
             }
 
             // Submit
@@ -92,12 +180,12 @@ export async function checkTarget(target, logCallback) {
                 const newBody = await page.innerText('body');
                 if (newBody.match(/welcome/i) || newBody.match(/bienvenue/i) || newBody.match(/success/i) || newBody.match(/activate/i)) {
                     await browser.close();
-                    return { success: true };
+                    return { success: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
                 }
             }
 
             await browser.close();
-            return { success: false, open: true }; // Open but failed/unknown result
+            return { success: false, open: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo }; // Open but failed/unknown result
         }
 
         // If Heuristics failed to find enough fields, OR if we want to force AI check for complex Q&A
@@ -144,7 +232,7 @@ export async function checkTarget(target, logCallback) {
                     const newBody = await page.innerText('body');
                     if (newBody.match(/welcome/i) || newBody.match(/bienvenue/i) || newBody.match(/success/i)) {
                         await browser.close();
-                        return { success: true };
+                        return { success: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
                     }
                 }
 
@@ -155,7 +243,7 @@ export async function checkTarget(target, logCallback) {
 
         logCallback(`No successful registration path found.`);
         await browser.close();
-        return { success: false, open: false };
+        return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo };
 
     } catch (error) {
         logCallback(`Browser Error: ${error.message}`);

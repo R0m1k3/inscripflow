@@ -24,6 +24,20 @@ let targets = [];
 if (fs.existsSync(DB_FILE)) {
   try {
     targets = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+
+    // STARTUP FIX: Reset any targets stuck in CHECKING to IDLE
+    let dirty = false;
+    targets.forEach(t => {
+      if (t.status === 'CHECKING') {
+        console.log(`[STARTUP] Resetting stuck target ${t.url} from CHECKING to IDLE`);
+        t.status = 'IDLE';
+        dirty = true;
+      }
+    });
+    if (dirty) {
+      fs.writeFileSync(DB_FILE, JSON.stringify(targets, null, 2));
+    }
+
   } catch (e) {
     console.error("Error reading targets DB", e);
   }
@@ -89,7 +103,8 @@ const log = (targetId, message) => {
   console.log(`[LOG:${targetId}] ${message}`); // Debug to stdout
   const target = targets.find(t => t.id === targetId);
   if (target) {
-    const logEntry = `[${new Date().toLocaleTimeString()}] ${message}`;
+    const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    const logEntry = `[${timeStr}] ${message}`;
     target.logs.unshift(logEntry);
     if (target.logs.length > 50) target.logs.pop();
     io.emit('log_update', { targetId, logEntry });
@@ -116,6 +131,18 @@ const runTargetCheck = async (target) => {
       checkTarget(target, (msg) => log(target.id, msg)),
       new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout limit of ${CHECK_TIMEOUT_MS / 1000}s exceeded`)), CHECK_TIMEOUT_MS))
     ]);
+
+    // Update forum metadata if detected
+    if (result.forumType || result.robotsInfo) {
+      target.forumType = result.forumType || target.forumType;
+      target.robotsInfo = result.robotsInfo || target.robotsInfo;
+      saveTargets();
+      io.emit('metadata_update', {
+        targetId: target.id,
+        forumType: target.forumType,
+        robotsInfo: target.robotsInfo
+      });
+    }
 
     if (result.success) {
       updateStatus(target.id, 'REGISTERED');
@@ -166,7 +193,19 @@ const startScheduler = (initialDelay = null) => {
     try {
       for (const target of targets) {
         if (target.status === 'REGISTERED') continue;
-        if (target.status === 'CHECKING') continue; // Skip if currently being checked manually
+
+        // Fix for Stuck Checks: If status is CHECKING but lastCheck is old (> 10 mins), reset it.
+        if (target.status === 'CHECKING') {
+          const timeSinceCheck = Date.now() - new Date(target.lastCheck).getTime();
+          const STALE_TIMEOUT = 10 * 60 * 1000; // 10 minutes
+
+          if (timeSinceCheck > STALE_TIMEOUT) {
+            console.log(`[SCHEDULER] Found stale CHECKING target ${target.url} (Last check: ${target.lastCheck}). Resetting/Retrying...`);
+            // We don't continue; we let it fall through to runTargetCheck, which will update status to CHECKING (fresh timestamp)
+          } else {
+            continue; // Still validly checking
+          }
+        }
 
         // Wrap individual check in try/catch just in case runTargetCheck fails unexpectedly
         try {

@@ -37,6 +37,9 @@ function App() {
         socket.on('log_update', ({ targetId, logEntry }) => {
             setTargets(prev => prev.map(t => t.id === targetId ? { ...t, logs: [logEntry, ...t.logs].slice(0, 50) } : t));
         });
+        socket.on('metadata_update', ({ targetId, forumType, robotsInfo }) => {
+            setTargets(prev => prev.map(t => t.id === targetId ? { ...t, forumType, robotsInfo } : t));
+        });
 
         // Initial fetch
         fetch(`${API_URL}/api/targets`).then(res => res.json()).then(setTargets);
@@ -45,6 +48,7 @@ function App() {
             socket.off('targets_updated');
             socket.off('status_update');
             socket.off('log_update');
+            socket.off('metadata_update');
         };
     }, []);
 
@@ -121,7 +125,21 @@ function App() {
                         <div className="grid grid-cols-2 gap-2 text-xs mb-4 text-gray-400 bg-black/20 p-2 rounded">
                             <div>USER: <span className="text-gray-300">{target.pseudo}</span></div>
                             <div>PASS: <span className="text-gray-300">******</span></div>
-                            <div className="col-span-2">LAST CHECK: {target.lastCheck ? new Date(target.lastCheck).toLocaleTimeString() : 'NEVER'}</div>
+                            <div className="col-span-2">LAST CHECK: {target.lastCheck ? new Date(target.lastCheck).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : 'NEVER'}</div>
+                            {target.forumType && (
+                                <div className="col-span-2 flex items-center gap-2">
+                                    <span className="text-gray-500">TYPE:</span>
+                                    <span className="px-2 py-0.5 bg-purple-600/30 text-purple-300 rounded text-xs font-bold">{target.forumType}</span>
+                                </div>
+                            )}
+                            {target.robotsInfo?.forumHints?.length > 0 && (
+                                <div className="col-span-2 flex items-center gap-2 flex-wrap">
+                                    <span className="text-gray-500">HINTS:</span>
+                                    {target.robotsInfo.forumHints.map((hint, i) => (
+                                        <span key={i} className="px-1.5 py-0.5 bg-cyan-600/20 text-cyan-400 rounded text-xs">{hint}</span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Logs Console */}
