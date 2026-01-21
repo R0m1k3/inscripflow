@@ -98,6 +98,61 @@ const FORUM_SIGNATURES = [
             /data-flarum/i
         ],
         registrationPaths: ['/signup', '/register']
+    },
+    // Modern Web Apps & Tracker Software
+    {
+        name: 'UNIT3D Tracker',
+        patterns: [
+            /unit3d/i,
+            /UNIT3D/i,
+            /powered by UNIT3D/i
+        ],
+        registrationPaths: ['/register', '/signup']
+    },
+    {
+        name: 'Nuxt.js',
+        patterns: [
+            /__nuxt/i,
+            /nuxt-ready/i,
+            /nuxt-loading/i,
+            /_nuxt\//i
+        ],
+        registrationPaths: ['/register', '/signup', '/auth/register']
+    },
+    {
+        name: 'Next.js',
+        patterns: [
+            /__NEXT_DATA__/i,
+            /_next\//i
+        ],
+        registrationPaths: ['/register', '/signup', '/auth/signup']
+    },
+    {
+        name: 'ASP.NET',
+        patterns: [
+            /aspnetcore/i,
+            /\/Home\/Register/i,
+            /\/Home\/Login/i,
+            /__RequestVerificationToken/i
+        ],
+        registrationPaths: ['/Home/Register', '/Account/Register', '/register']
+    },
+    {
+        name: 'Vue.js',
+        patterns: [
+            /data-v-[a-f0-9]/i,
+            /vue-app/i
+        ],
+        registrationPaths: ['/register', '/signup']
+    },
+    {
+        name: 'Gazelle Tracker',
+        patterns: [
+            /gazelle/i,
+            /torrents\.php/i,
+            /user\.php\?action=/i
+        ],
+        registrationPaths: ['/register.php', '/user.php?action=register']
     }
 ];
 
