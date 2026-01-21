@@ -22,8 +22,10 @@ services:
       - "4000:4000"
     volumes:
       # Only mapping config/data, code is inside the image
-      - ./server/targets.json:/app/targets.json
-      - ./server/settings.json:/app/settings.json
+      # COMMENTED OUT: If you didn't git clone the repo, these bind mounts will break the app.
+      # We will rely on the internal files for now. Data will be reset on container recreation.
+      #- ./server/targets.json:/app/targets.json
+      #- ./server/settings.json:/app/settings.json
     environment:
       - BROWSERLESS_HOST=browserless
       - PORT=4000
