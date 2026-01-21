@@ -178,9 +178,25 @@ export async function checkTarget(target, logCallback) {
         }
 
         // 2. Search for Inputs
+        // 2. Search for Inputs (checking name, id, placeholder, and labels)
         const passwordInputs = await page.locator('input[type="password"]').count();
-        const emailInputs = await page.locator('input[type="email"], input[name*="mail"]').count();
+        const emailInputs = await page.locator('input[type="email"], input[name*="mail"], input[placeholder*="mail"], input[placeholder*="courriel"]').count();
         const textareaCount = await page.locator('textarea').count();
+
+        // Check for invitation code inputs (by name, placeholder, or nearby label)
+        const inviteInputs = await page.locator('input').filter({ has: page.locator('xpath=self::*[contains(@name, "invite") or contains(@name, "code") or contains(@placeholder, "invitation") or contains(@placeholder, "invite") or contains(@placeholder, "code")]') }).count();
+
+        // Also check labels if input attributes are missing
+        const labelInvite = await page.locator('label', { hasText: /invitation|invite|code/i }).count();
+        const needsInvite = inviteInputs > 0 || labelInvite > 0;
+
+        if (needsInvite) {
+            const submitBtn = page.locator('button[type="submit"], input[type="submit"]').first();
+            // If we have an invite field AND a submit button (enabled or disabled), we likely need an invite
+            logCallback(`Invitation code field detected!`);
+            await browser.close();
+            return { success: false, open: true, needsInvite: true, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
+        }
 
         // Use strict heuristics ONLY if it looks like a simple form (no text areas for questions)
         if (passwordInputs > 0 && emailInputs > 0 && textareaCount === 0) {
@@ -190,10 +206,10 @@ export async function checkTarget(target, logCallback) {
             logCallback(`Attempting to fill form...`);
 
             // Fill Email
-            await page.locator('input[type="email"], input[name*="mail"]').first().fill(target.email);
+            await page.locator('input[type="email"], input[name*="mail"], input[placeholder*="mail"], input[placeholder*="courriel"]').first().fill(target.email);
 
             // Fill Pseudo/Username
-            const usernameInput = page.locator('input[name*="user"], input[name*="pseudo"], input[name*="login"]');
+            const usernameInput = page.locator('input[name*="user"], input[name*="pseudo"], input[name*="login"], input[placeholder*="utilisateur"], input[placeholder*="pseudo"], input[placeholder*="username"]');
             if (await usernameInput.count() > 0) {
                 await usernameInput.first().fill(target.pseudo);
             }
@@ -207,6 +223,8 @@ export async function checkTarget(target, logCallback) {
             }
 
             logCallback(`Form partially filled. Checking for Captcha...`);
+
+            // ... (rest of the filling logic)
 
             // Check for Captcha frames
             const iframes = await page.frames();
