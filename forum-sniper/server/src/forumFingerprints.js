@@ -101,6 +101,16 @@ const FORUM_SIGNATURES = [
     },
     // Modern Web Apps & Tracker Software
     {
+        name: 'TorrentTrader',
+        patterns: [
+            /TorrentTrader/i,
+            /account-signup\.php/i,
+            /powered by TorrentTrader/i,
+            /SB_SHAMAN/i
+        ],
+        registrationPaths: ['/account-signup.php']
+    },
+    {
         name: 'UNIT3D Tracker',
         patterns: [
             /unit3d/i,

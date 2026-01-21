@@ -136,6 +136,27 @@ async function performIntelligence(domain, forumName) {
         description: `Check tracker status and invite availability`
     });
 
+    // 4. Wayback Machine (Historical Cache)
+    results.push({
+        source: 'Wayback Machine',
+        url: `https://web.archive.org/web/*/${domain}`,
+        description: `Check historical versions of the site for codes`
+    });
+
+    // 5. Text Dumps (Pastebin, JustPaste, etc.)
+    results.push({
+        source: 'Text Dumps Search',
+        url: `https://www.google.com/search?q=${encodeURIComponent('site:pastebin.com OR site:justpaste.it OR site:rentry.co "' + domain + '"')}`,
+        description: `Search for codes in public text dumps`
+    });
+
+    // 6. Yandex Search (Less censored)
+    results.push({
+        source: 'Yandex Search',
+        url: `https://yandex.com/search/?text=${encodeURIComponent('"' + domain + '" invite code')}`,
+        description: `Broad search on Yandex (often better results)`
+    });
+
     return results;
 }
 
@@ -331,20 +352,43 @@ export async function analyzeUrl(inputUrl, progressCallback) {
                         // Extract form fields
                         const fields = await page.evaluate(() => {
                             return Array.from(document.querySelectorAll('input, textarea, select'))
-                                .filter(el => el.name || el.id)
-                                .map(el => ({
-                                    type: el.type || el.tagName.toLowerCase(),
-                                    name: el.name || el.id,
-                                    placeholder: el.placeholder || '',
-                                    required: el.required
-                                }));
+                                .filter(el => (el.name || el.id) && el.type !== 'hidden')
+                                .map(el => {
+                                    // Find associated label
+                                    let label = '';
+                                    if (el.id) {
+                                        const labelEl = document.querySelector(`label[for="${el.id}"]`);
+                                        if (labelEl) label = labelEl.innerText;
+                                    }
+                                    if (!label && el.closest('label')) {
+                                        label = el.closest('label').innerText;
+                                    }
+                                    // Try to find label in previous element if not found
+                                    if (!label) {
+                                        const prev = el.previousElementSibling;
+                                        if (prev && (prev.tagName === 'LABEL' || prev.tagName === 'SPAN' || prev.tagName === 'B')) {
+                                            label = prev.innerText;
+                                        }
+                                    }
+
+                                    return {
+                                        type: el.type || el.tagName.toLowerCase(),
+                                        name: el.name || el.id,
+                                        placeholder: el.placeholder || '',
+                                        title: el.title || '',
+                                        label: label.trim(),
+                                        required: el.required
+                                    };
+                                });
                         });
                         report.formFields = fields;
 
                         // Check for invitation code field
                         const hasInviteField = fields.some(f =>
-                            f.name.match(/invite|code|referral/i) ||
-                            f.placeholder.match(/invite|code|referral/i)
+                            (f.name && f.name.match(/invite|code|referral|parrainage/i)) ||
+                            (f.placeholder && f.placeholder.match(/invite|code|referral|parrainage/i)) ||
+                            (f.title && f.title.match(/invite|code|referral|parrainage/i)) ||
+                            (f.label && f.label.match(/invite|code|referral|parrainage/i))
                         );
                         if (hasInviteField) {
                             report.notes.push('⚠️ Requires invitation code');
