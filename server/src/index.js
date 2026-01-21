@@ -7,6 +7,7 @@ import path from 'path';
 import { checkTarget } from './worker.js';
 import { configureAI } from './aiService.js';
 import { analyzeUrl } from './analyzer.js';
+import { startRedditMonitor } from './services/reddit.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -262,6 +263,28 @@ const startScheduler = (initialDelay = null) => {
 // Start initial loop
 // Start initial loop with 1 minute delay
 startScheduler(60 * 1000);
+
+// Start Reddit Monitor
+startRedditMonitor((url, source) => {
+  // Check duplicates
+  if (targets.some(t => t.url === url || t.url === url + '/')) return false;
+
+  const newTarget = {
+    id: Date.now().toString(),
+    url: url,
+    pseudo: `AutoUser_${Math.floor(Math.random() * 1000)}`, // Placeholder
+    email: '',
+    password: '',
+    status: 'IDLE',
+    logs: [`[${source}] Auto-detected from Reddit r/FrancePirate`],
+    lastCheck: null
+  };
+  targets.push(newTarget);
+  saveTargets();
+  io.emit('targets_updated', targets);
+  console.log(`[REDDIT] Added new target: ${url}`);
+  return true;
+}, (msg) => console.log(`[REDDIT] ${msg}`));
 
 httpServer.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
