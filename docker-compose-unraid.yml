@@ -1,6 +1,5 @@
-# NOTE: This file is optimized for Unraid USB Sticks.
-# It DOES NOT build images. It downloads Node.js and installs dependencies at runtime.
-# This prevents permission errors on /boot.
+# NOTE: This file uses PRE-BUILT images from GitHub Container Registry.
+# It downloads ready-to-run containers. No building required.
 
 services:
   browserless:
@@ -15,17 +14,16 @@ services:
       - unraid_sniper_net
 
   backend:
-    image: node:18-alpine
+    # Pulls the image built by GitHub Actions
+    image: ghcr.io/r0m1k3/inscripflow-backend:main
     container_name: forum_backend
-    working_dir: /app
     restart: unless-stopped
     ports:
       - "4000:4000"
     volumes:
-      # Map source code
-      - ./server:/app
-      # PERSISTENT named volume for node_modules (Crucial for performance/USB health)
-      - backend_node_modules:/app/node_modules
+      # Only mapping config/data, code is inside the image
+      - ./server/targets.json:/app/targets.json
+      - ./server/settings.json:/app/settings.json
     environment:
       - BROWSERLESS_HOST=browserless
       - PORT=4000
@@ -33,32 +31,23 @@ services:
       - browserless
     networks:
       - unraid_sniper_net
-    # Install deps on start, then run
-    command: /bin/sh -c "npm install && npm start"
+    # Image already has CMD ["npm", "run", "dev"] or "start", we can stick to default or override
+    command: npm start
 
   frontend:
-    image: node:18-alpine
+    # Pulls the image built by GitHub Actions
+    image: ghcr.io/r0m1k3/inscripflow-frontend:main
     container_name: forum_frontend
-    working_dir: /app
     restart: unless-stopped
     ports:
       - "5173:5173"
-    volumes:
-      - ./client:/app
-      # PERSISTENT named volume for node_modules
-      - frontend_node_modules:/app/node_modules
     environment:
-      # REPLACE WITH YOUR UNRAID IP IF NEEDED
       - VITE_API_URL=http://192.168.1.16:4000
     networks:
       - unraid_sniper_net
-    # Install deps on start, then run dev
-    command: /bin/sh -c "npm install && npm run dev -- --host"
+    # Ensure host bind for access outside container
+    command: npm run dev -- --host
 
 networks:
   unraid_sniper_net:
     driver: bridge
-
-volumes:
-  backend_node_modules:
-  frontend_node_modules:
