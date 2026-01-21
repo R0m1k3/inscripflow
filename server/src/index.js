@@ -214,8 +214,8 @@ const CHECK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max per check
 
 // Random Scheduler (Stealth Mode)
 // DEBUG: Reduced intervals for testing (was 45-90 mins)
-const MIN_INTERVAL = 2 * 60 * 1000; // 2 minutes
-const MAX_INTERVAL = 5 * 60 * 1000; // 5 minutes
+const MIN_INTERVAL = 10 * 60 * 1000; // 10 minutes
+const MAX_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
 const startScheduler = (initialDelay = null) => {
   const delay = initialDelay !== null
