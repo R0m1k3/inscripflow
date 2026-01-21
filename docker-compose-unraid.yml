@@ -7,7 +7,7 @@ services:
     container_name: forum_browserless
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3010:3000"
     environment:
       - TIMEOUT=60000
     networks:
