@@ -35,7 +35,7 @@ let settings = { openRouterKey: '' };
 if (fs.existsSync(SETTINGS_FILE)) {
   try { settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); } catch (e) { }
 }
-configureAI(settings.openRouterKey);
+configureAI(settings.openRouterKey, settings.model);
 
 const saveTargets = () => {
   fs.writeFileSync(DB_FILE, JSON.stringify(targets, null, 2));
@@ -70,8 +70,9 @@ app.delete('/api/targets/:id', (req, res) => {
 
 app.post('/api/settings', (req, res) => {
   settings.openRouterKey = req.body.openRouterKey;
+  if (req.body.model) settings.model = req.body.model;
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
-  configureAI(settings.openRouterKey);
+  configureAI(settings.openRouterKey, settings.model);
   res.json({ success: true });
 });
 
@@ -111,7 +112,10 @@ const runTargetCheck = async (target) => {
   log(target.id, `Checking status for ${target.url}...`);
 
   try {
-    const result = await checkTarget(target, (msg) => log(target.id, msg));
+    const result = await Promise.race([
+      checkTarget(target, (msg) => log(target.id, msg)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout limit of ${CHECK_TIMEOUT_MS / 1000}s exceeded`)), CHECK_TIMEOUT_MS))
+    ]);
 
     if (result.success) {
       updateStatus(target.id, 'REGISTERED');
@@ -141,30 +145,48 @@ app.post('/api/targets/:id/check', async (req, res) => {
   res.json({ success: true, message: 'Check initiated' });
 });
 
-// Random Scheduler (Stealth Mode)
-const MIN_INTERVAL = 45 * 60 * 1000; // 45 minutes
-const MAX_INTERVAL = 90 * 60 * 1000; // 90 minutes
+const CHECK_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes max per check
 
-const startScheduler = () => {
-  const delay = Math.floor(Math.random() * (MAX_INTERVAL - MIN_INTERVAL + 1)) + MIN_INTERVAL;
+// Random Scheduler (Stealth Mode)
+// DEBUG: Reduced intervals for testing (was 45-90 mins)
+const MIN_INTERVAL = 2 * 60 * 1000; // 2 minutes
+const MAX_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
+const startScheduler = (initialDelay = null) => {
+  const delay = initialDelay !== null
+    ? initialDelay
+    : Math.floor(Math.random() * (MAX_INTERVAL - MIN_INTERVAL + 1)) + MIN_INTERVAL;
+
   const nextCheck = new Date(Date.now() + delay).toLocaleTimeString();
 
   console.log(`[SCHEDULER] Next check loop scheduled in ${Math.round(delay / 60000)} minutes (${nextCheck})`);
 
   setTimeout(async () => {
     console.log(`[SCHEDULER] Starting check batch...`);
-    for (const target of targets) {
-      if (target.status === 'REGISTERED') continue;
-      if (target.status === 'CHECKING') continue;
-      await runTargetCheck(target);
+    try {
+      for (const target of targets) {
+        if (target.status === 'REGISTERED') continue;
+        if (target.status === 'CHECKING') continue; // Skip if currently being checked manually
+
+        // Wrap individual check in try/catch just in case runTargetCheck fails unexpectedly
+        try {
+          await runTargetCheck(target);
+        } catch (targetError) {
+          console.error(`[SCHEDULER] Critical error checking target ${target.id}:`, targetError);
+        }
+      }
+    } catch (batchError) {
+      console.error("[SCHEDULER] Critical error in check batch:", batchError);
+    } finally {
+      // Schedule next run regardless of errors
+      startScheduler();
     }
-    // Schedule next run
-    startScheduler();
   }, delay);
 };
 
 // Start initial loop
-startScheduler();
+// Start initial loop with 1 minute delay
+startScheduler(60 * 1000);
 
 httpServer.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);

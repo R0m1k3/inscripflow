@@ -3,11 +3,18 @@ import OpenAI from 'openai';
 let openai = null;
 let aiConfig = {
     apiKey: process.env.OPENROUTER_API_KEY || '',
-    model: 'google/gemini-2.0-flash-exp:free'
+    model: 'google/gemini-2.0-flash-001'
 };
 
-export const configureAI = (apiKey) => {
+export const configureAI = (apiKey, model = null) => {
     aiConfig.apiKey = apiKey;
+    if (model) aiConfig.model = model;
+
+    // Default to a stable model if the current one is problematic
+    if (!aiConfig.model || aiConfig.model.includes('free')) {
+        aiConfig.model = 'google/gemini-2.0-flash-001';
+    }
+
     if (apiKey) {
         openai = new OpenAI({
             baseURL: "https://openrouter.ai/api/v1",
