@@ -2,7 +2,7 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 
 const SUBREDDIT_URL = 'https://www.reddit.com/r/FrancePirate/new.json?limit=25';
 const BASE_INTERVAL = 15 * 60 * 1000; // 15 Minutes
-const KEYWORDS_REGEX = /(ouvert|invitation|code|regist|s'inscrire|open|sign\s*up)/i;
+const KEYWORDS_REGEX = /(ouvert|invitation|code|regist|s'inscrire|open|sign\s*up|liste|tracker|nouveau|adresse|lien|source|board|forum)/i;
 const URL_REGEX = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%._\+.~#?&//=]*)/g;
 
 // List of ignored domains
@@ -93,7 +93,8 @@ export const startRedditMonitor = (addTargetCallback, logCallback) => {
                 const content = `${title} ${selftext} ${url}`;
 
                 if (!KEYWORDS_REGEX.test(content)) {
-                    // addToHistory({ title, url, status: 'IGNORED_NO_KEYWORD' }); // Too noisy to log every post
+                    addToHistory({ title, url, status: 'IGNORED_NO_KEYWORD' }); // Keep log for visibility
+
                     continue;
                 }
 
