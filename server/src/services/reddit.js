@@ -9,7 +9,8 @@ const URL_REGEX = /https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-
 const IGNORED_DOMAINS = [
     'reddit.com', 'redd.it', 'imgur.com', 'gyazo.com', 'youtube.com', 'youtu.be',
     'discord.gg', 'discord.com', 't.me', 'twitter.com', 'x.com', 'facebook.com',
-    'pinterest.com', 'google.com', 'yggtorrent.li', 'sharewood.tv'
+    'pinterest.com', 'google.com', 'yggtorrent.li', 'sharewood.tv',
+    'github.com', 'gitlab.com', 'sourceforge.net', 'archive.org'
 ];
 
 // Stealth User Agents

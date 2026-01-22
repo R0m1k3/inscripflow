@@ -10,7 +10,12 @@ function App() {
     const [showAddForm, setShowAddForm] = useState(false);
     const [newTarget, setNewTarget] = useState({ url: '', pseudo: '', email: '', password: '' });
     const [showSettings, setShowSettings] = useState(false);
-    const [apiKey, setApiKey] = useState('');
+    const [settingsForm, setSettingsForm] = useState({
+        openRouterKey: '',
+        defaultPseudo: '',
+        defaultEmail: '',
+        defaultPassword: ''
+    });
     const [showAnalyze, setShowAnalyze] = useState(false);
     const [analyzeUrl, setAnalyzeUrl] = useState('');
     const [analyzing, setAnalyzing] = useState(false);
@@ -20,7 +25,17 @@ function App() {
 
     useEffect(() => {
         if (showSettings) {
-            fetch(`${API_URL}/api/settings`).then(r => r.json()).then(d => setApiKey(d.openRouterKey || ''));
+            fetch(`${API_URL}/api/settings`).then(r => r.json()).then(d => {
+                setApiKey(d.openRouterKey || '');
+                // Load other settings if needed, but for now we just use a local state or ref to manage the form?
+                // Actually, let's update state to hold all settings
+                setSettingsForm({
+                    openRouterKey: d.openRouterKey || '',
+                    defaultPseudo: d.defaultPseudo || '',
+                    defaultEmail: d.defaultEmail || '',
+                    defaultPassword: d.defaultPassword || ''
+                });
+            });
         }
     }, [showSettings]);
 
@@ -29,7 +44,7 @@ function App() {
         await fetch(`${API_URL}/api/settings`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ openRouterKey: apiKey })
+            body: JSON.stringify(settingsForm)
         });
         setShowSettings(false);
     };
@@ -338,19 +353,58 @@ function App() {
                             </h2>
                             <form onSubmit={saveSettings} className="space-y-4">
                                 <div className="bg-blue-900/20 border border-blue-900 p-3 rounded text-xs text-blue-200 mb-4">
-                                    Enter your OpenRouter API Key to enable AI-powered form filling and Q&A handling (Gemini 2 Flash).
+                                    Global configuration for AI and default credentials.
                                 </div>
-                                <div>
-                                    <label className="block text-xs text-gray-400 mb-1">OPENROUTER API KEY</label>
-                                    <input
-                                        required
-                                        type="password"
-                                        placeholder="sk-or-..."
-                                        className="w-full bg-black border border-gray-700 rounded p-2 focus:border-blue-500 outline-none transition-colors"
-                                        value={apiKey}
-                                        onChange={e => setApiKey(e.target.value)}
-                                    />
+
+                                <div className="space-y-4 border-b border-gray-700 pb-4 mb-4">
+                                    <h3 className="text-sm font-bold text-gray-300">AI Service</h3>
+                                    <div>
+                                        <label className="block text-xs text-gray-400 mb-1">OPENROUTER API KEY</label>
+                                        <input
+                                            type="password"
+                                            placeholder="sk-or-..."
+                                            className="w-full bg-black border border-gray-700 rounded p-2 focus:border-blue-500 outline-none transition-colors"
+                                            value={settingsForm.openRouterKey}
+                                            onChange={e => setSettingsForm({ ...settingsForm, openRouterKey: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
+
+                                <div className="space-y-4">
+                                    <h3 className="text-sm font-bold text-gray-300">Default Credentials</h3>
+                                    <p className="text-xs text-gray-500">Automatically applied to new targets found by Reddit or added manually.</p>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs text-gray-400 mb-1">DEFAULT PSEUDO</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-black border border-gray-700 rounded p-2 focus:border-blue-500 outline-none"
+                                                value={settingsForm.defaultPseudo}
+                                                onChange={e => setSettingsForm({ ...settingsForm, defaultPseudo: e.target.value })}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs text-gray-400 mb-1">DEFAULT PASSWORD</label>
+                                            <input
+                                                type="text"
+                                                className="w-full bg-black border border-gray-700 rounded p-2 focus:border-blue-500 outline-none"
+                                                value={settingsForm.defaultPassword}
+                                                onChange={e => setSettingsForm({ ...settingsForm, defaultPassword: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-gray-400 mb-1">DEFAULT EMAIL</label>
+                                        <input
+                                            type="email"
+                                            className="w-full bg-black border border-gray-700 rounded p-2 focus:border-blue-500 outline-none"
+                                            value={settingsForm.defaultEmail}
+                                            onChange={e => setSettingsForm({ ...settingsForm, defaultEmail: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
                                 <div className="flex justify-end gap-3 mt-6">
                                     <button
                                         type="button"

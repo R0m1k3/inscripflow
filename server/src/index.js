@@ -52,9 +52,17 @@ if (fs.existsSync(DB_FILE)) {
 
 // Load Settings (API Key)
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
-let settings = { openRouterKey: '' };
+let settings = {
+  openRouterKey: '',
+  defaultPseudo: '',
+  defaultEmail: '',
+  defaultPassword: ''
+};
 if (fs.existsSync(SETTINGS_FILE)) {
-  try { settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8')); } catch (e) { }
+  try {
+    const saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
+    settings = { ...settings, ...saved }; // Merge defaults
+  } catch (e) { }
 }
 configureAI(settings.openRouterKey, settings.model);
 
@@ -69,9 +77,9 @@ app.post('/api/targets', (req, res) => {
   const newTarget = {
     id: Date.now().toString(),
     url: req.body.url,
-    pseudo: req.body.pseudo,
-    email: req.body.email,
-    password: req.body.password,
+    pseudo: req.body.pseudo || settings.defaultPseudo || `AutoUser_${Math.floor(Math.random() * 1000)}`,
+    email: req.body.email || settings.defaultEmail || '',
+    password: req.body.password || settings.defaultPassword || '',
     status: 'IDLE', // IDLE, CHECKING, OPEN, REGISTERED, ERROR
     logs: [],
     lastCheck: null
@@ -90,8 +98,14 @@ app.delete('/api/targets/:id', (req, res) => {
 });
 
 app.post('/api/settings', (req, res) => {
-  settings.openRouterKey = req.body.openRouterKey;
-  if (req.body.model) settings.model = req.body.model;
+  if (req.body.openRouterKey !== undefined) settings.openRouterKey = req.body.openRouterKey;
+  if (req.body.model !== undefined) settings.model = req.body.model;
+
+  // Default Credentials
+  if (req.body.defaultPseudo !== undefined) settings.defaultPseudo = req.body.defaultPseudo;
+  if (req.body.defaultEmail !== undefined) settings.defaultEmail = req.body.defaultEmail;
+  if (req.body.defaultPassword !== undefined) settings.defaultPassword = req.body.defaultPassword;
+
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
   configureAI(settings.openRouterKey, settings.model);
   res.json({ success: true });
@@ -279,9 +293,10 @@ startRedditMonitor((url, source) => {
   const newTarget = {
     id: Date.now().toString(),
     url: url,
-    pseudo: `AutoUser_${Math.floor(Math.random() * 1000)}`, // Placeholder
-    email: '',
-    password: '',
+    url: url,
+    pseudo: settings.defaultPseudo || `AutoUser_${Math.floor(Math.random() * 1000)}`,
+    email: settings.defaultEmail || '',
+    password: settings.defaultPassword || '',
     status: 'IDLE',
     logs: [`[${source}] Auto-detected from Reddit r/FrancePirate`],
     lastCheck: null
