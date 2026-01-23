@@ -20,8 +20,14 @@ const PORT = process.env.PORT || 4000;
 app.use(cors());
 app.use(express.json());
 
-// Load targets from DB
-let targets = getAllTargets();
+// Load targets from DB with error handling
+let targets = [];
+try {
+  targets = getAllTargets();
+  console.log(`[DB] Loaded ${targets.length} targets from database`);
+} catch (err) {
+  console.error('[DB] Failed to load targets:', err);
+}
 
 // STARTUP FIX: Reset any targets stuck in CHECKING to IDLE
 let dirty = false;
@@ -29,23 +35,35 @@ targets.forEach(t => {
   if (t.status === 'CHECKING') {
     console.log(`[STARTUP] Resetting stuck target ${t.url} from CHECKING to IDLE`);
     t.status = 'IDLE';
-    upsertTarget(t);
+    try { upsertTarget(t); } catch (e) { console.error('[DB] upsertTarget failed:', e); }
   }
 });
 
-// Load Settings from DB
+// Load Settings from DB with error handling
 let settings = {
   openRouterKey: '',
   defaultPseudo: '',
   defaultEmail: '',
-  defaultPassword: '',
-  ...getSettings()
+  defaultPassword: ''
 };
+try {
+  settings = { ...settings, ...getSettings() };
+  console.log('[DB] Loaded settings from database');
+} catch (err) {
+  console.error('[DB] Failed to load settings:', err);
+}
 
 configureAI(settings.openRouterKey, settings.model);
 
-// Routes
-app.get('/api/targets', (req, res) => res.json(targets));
+// Routes with error handling
+app.get('/api/targets', (req, res) => {
+  try {
+    res.json(targets);
+  } catch (err) {
+    console.error('[API] GET /api/targets error:', err);
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
+});
 
 app.post('/api/targets', (req, res) => {
   const newTarget = {
