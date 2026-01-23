@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import io from 'socket.io-client';
 import { Target, ShieldAlert, CheckCircle, Clock, Plus, Trash2, Terminal, PauseCircle, PlayCircle, Search } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || '';
+// Ensure API_URL doesn't produce double-slashes when combined with /api
+const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const socket = io(API_URL);
 
 function App() {

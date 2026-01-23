@@ -45,7 +45,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=/
+      - VITE_API_URL=
     networks:
       - unraid_sniper_net
     # Ensure host bind for access outside container
