@@ -65,28 +65,43 @@ app.get('/api/targets', (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', targets: targets.length, dbConnected: true });
+});
+
 app.post('/api/targets', (req, res) => {
-  const newTarget = {
-    id: Date.now().toString(),
-    url: req.body.url,
-    pseudo: req.body.pseudo || settings.defaultPseudo || `AutoUser_${Math.floor(Math.random() * 1000)}`,
-    email: req.body.email || settings.defaultEmail || '',
-    password: req.body.password || settings.defaultPassword || '',
-    status: 'IDLE', // IDLE, CHECKING, OPEN, REGISTERED, ERROR
-    logs: [],
-    lastCheck: null
-  };
-  targets.push(newTarget);
-  upsertTarget(newTarget);
-  io.emit('targets_updated', targets);
-  res.json(newTarget);
+  try {
+    const newTarget = {
+      id: Date.now().toString(),
+      url: req.body.url,
+      pseudo: req.body.pseudo || settings.defaultPseudo || `AutoUser_${Math.floor(Math.random() * 1000)}`,
+      email: req.body.email || settings.defaultEmail || '',
+      password: req.body.password || settings.defaultPassword || '',
+      status: 'IDLE', // IDLE, CHECKING, OPEN, REGISTERED, ERROR
+      logs: [],
+      lastCheck: null
+    };
+    targets.push(newTarget);
+    upsertTarget(newTarget);
+    io.emit('targets_updated', targets);
+    res.json(newTarget);
+  } catch (err) {
+    console.error('[API] POST /api/targets error:', err);
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
 });
 
 app.delete('/api/targets/:id', (req, res) => {
-  targets = targets.filter(t => t.id !== req.params.id);
-  deleteTarget(req.params.id);
-  io.emit('targets_updated', targets);
-  res.json({ success: true });
+  try {
+    targets = targets.filter(t => t.id !== req.params.id);
+    deleteTarget(req.params.id);
+    io.emit('targets_updated', targets);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[API] DELETE /api/targets error:', err);
+    res.status(500).json({ error: err.message, stack: err.stack });
+  }
 });
 
 app.post('/api/settings', (req, res) => {
