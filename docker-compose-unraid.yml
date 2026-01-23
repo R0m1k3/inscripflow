@@ -21,6 +21,7 @@ services:
     ports:
       - "4000:4000"
     volumes:
+      - forum_sniper_data:/app/data
       # Only mapping config/data, code is inside the image
       # COMMENTED OUT: If you didn't git clone the repo, these bind mounts will break the app.
       # We will rely on the internal files for now. Data will be reset on container recreation.
@@ -44,7 +45,7 @@ services:
     ports:
       - "5173:5173"
     environment:
-      - VITE_API_URL=http://192.168.1.16:4000
+      - VITE_API_URL=/
     networks:
       - unraid_sniper_net
     # Ensure host bind for access outside container
@@ -53,3 +54,8 @@ services:
 networks:
   unraid_sniper_net:
     driver: bridge
+
+volumes:
+  forum_sniper_data:
+
+

@@ -1,23 +1,20 @@
-# Task: Migrate/Fix SQLite Persistence
+# Task: Fix Mixed Content & API Connection Issues
 
 ## Context
 
-The user reports data loss (configuration, etc.) when changing browsers or updating. This implies data is either stored in Client LocalStorage or not persisted properly on the Server. The goal is to ensure all data is running on SQLite and persisted.
+The user is accessing the application via HTTPS (`https://snip.vonrodbox.eu/`), but the frontend is trying to connect to the backend via insecure HTTP (`http://192.168.1.16:4010`). Browsers block this as "Mixed Content".
 
 ## Current Focus
 
-Analyzing the current implementation and planning the fix.
+Diagnosing the deployment configuration and fixing the API URL to support HTTPS.
 
 ## Master Plan
 
-- [x] Analyze Backend (`server`) for current storage (found `database.js` with SQLite). <!-- id: 0 -->
-- [x] Analyze Frontend (`client`) to see if it uses API or LocalStorage for settings. <!-- id: 1 -->
-- [x] Create Implementation Plan to enforce SQLite usage and fix persistence. <!-- id: 2 -->
-- [x] Execute Fixes:
-  - [x] Update Frontend to sync settings with Backend. <!-- id: 3 -->
-  - [x] Ensure Docker volume configuration persists `server/data`. <!-- id: 4 -->
-- [x] Verify persistence (Simulate browser change/restart). <!-- id: 5 -->
+- [ ] Analyze `docker-compose-unraid.yml` (if applicable) and current env vars. <!-- id: 0 -->
+- [ ] Determine correct `VITE_API_URL` configuration (`/` relative request or HTTPS URL). <!-- id: 1 -->
+- [ ] Update Frontend/Docker configuration to support HTTPS or relative paths. <!-- id: 2 -->
+- [ ] Configure Proxy (Nginx/Traefik) if necessary (User guidance). <!-- id: 3 -->
 
 ## Progress Log
 
-- [x] Backend analysis: `database.js` has SQLite logic. `server/data` missing on host.
+- [x] Task created.
