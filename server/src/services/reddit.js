@@ -103,6 +103,16 @@ export const startRedditMonitor = (addTargetCallback, logCallback) => {
 
                 for (const foundUrl of urls) {
                     try {
+                        // FIX: Clean trailing ')' if unmatched (common in Reddit posts like "(http://url)")
+                        if (foundUrl.endsWith(')')) {
+                            const openParens = (foundUrl.match(/\(/g) || []).length;
+                            const closeParens = (foundUrl.match(/\)/g) || []).length;
+                            // If more closing than opening, assume the last one is part of the text wrapper, not the URL
+                            if (closeParens > openParens) {
+                                foundUrl = foundUrl.slice(0, -1);
+                            }
+                        }
+
                         const urlObj = new URL(foundUrl);
                         if (IGNORED_DOMAINS.some(d => urlObj.hostname.includes(d))) {
                             addToHistory({ title, url: foundUrl, status: 'IGNORED_DOMAIN' });
