@@ -10,6 +10,17 @@ function App() {
     const [targets, setTargets] = useState([]);
     const [showAddForm, setShowAddForm] = useState(false);
     const [newTarget, setNewTarget] = useState({ url: '', pseudo: '', email: '', password: '' });
+
+    // Pre-fill form with settings when opening add form
+    const openAddForm = () => {
+        setNewTarget({
+            url: '',
+            pseudo: settingsForm.defaultPseudo || '',
+            email: settingsForm.defaultEmail || '',
+            password: settingsForm.defaultPassword || ''
+        });
+        setShowAddForm(true);
+    };
     const [showSettings, setShowSettings] = useState(false);
     const [settingsForm, setSettingsForm] = useState({
         openRouterKey: '',
@@ -143,7 +154,7 @@ function App() {
                         <Search className="w-4 h-4" /> ANALYZE
                     </button>
                     <button
-                        onClick={() => setShowAddForm(true)}
+                        onClick={() => openAddForm()}
                         className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors"
                     >
                         <Plus className="w-4 h-4" /> ADD TARGET
@@ -172,7 +183,7 @@ function App() {
                         <span className="text-gray-600">Last 50 events</span>
                     </div>
                     <div className="flex-1 overflow-auto logs-scrollbar font-mono text-xs space-y-1">
-                        {redditStats.history.map((h, i) => (
+                        {[...redditStats.history].reverse().map((h, i) => (
                             <div key={i} className="flex gap-2 border-b border-gray-800/50 pb-1 last:border-0">
                                 <span className="text-gray-600">[{new Date(h.timestamp).toLocaleTimeString()}]</span>
                                 <span className={`font-bold ${h.status === 'ADDED' ? 'text-green-500' : h.status === 'ERROR' ? 'text-red-500' : 'text-gray-500'}`}>{h.status}</span>
