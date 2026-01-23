@@ -2,12 +2,12 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import fs from 'fs';
 import path from 'path';
 import { checkTarget } from './worker.js';
 import { configureAI } from './aiService.js';
 import { analyzeUrl } from './analyzer.js';
 import { startRedditMonitor, getRedditStats } from './services/reddit.js';
+import { getAllTargets, upsertTarget, deleteTarget, getSettings, saveSettings } from './database.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -15,60 +15,34 @@ const io = new Server(httpServer, {
   cors: { origin: "*" }
 });
 
-const DATA_DIR = path.resolve('data');
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
 const PORT = process.env.PORT || 4000;
-const DB_FILE = path.join(DATA_DIR, 'targets.json');
 
 app.use(cors());
 app.use(express.json());
 
-// Load targets
-let targets = [];
-if (fs.existsSync(DB_FILE)) {
-  try {
-    targets = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
+// Load targets from DB
+let targets = getAllTargets();
 
-    // STARTUP FIX: Reset any targets stuck in CHECKING to IDLE
-    let dirty = false;
-    targets.forEach(t => {
-      if (t.status === 'CHECKING') {
-        console.log(`[STARTUP] Resetting stuck target ${t.url} from CHECKING to IDLE`);
-        t.status = 'IDLE';
-        dirty = true;
-      }
-    });
-    if (dirty) {
-      fs.writeFileSync(DB_FILE, JSON.stringify(targets, null, 2));
-    }
-
-  } catch (e) {
-    console.error("Error reading targets DB", e);
+// STARTUP FIX: Reset any targets stuck in CHECKING to IDLE
+let dirty = false;
+targets.forEach(t => {
+  if (t.status === 'CHECKING') {
+    console.log(`[STARTUP] Resetting stuck target ${t.url} from CHECKING to IDLE`);
+    t.status = 'IDLE';
+    upsertTarget(t);
   }
-}
+});
 
-// Load Settings (API Key)
-const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+// Load Settings from DB
 let settings = {
   openRouterKey: '',
   defaultPseudo: '',
   defaultEmail: '',
-  defaultPassword: ''
+  defaultPassword: '',
+  ...getSettings()
 };
-if (fs.existsSync(SETTINGS_FILE)) {
-  try {
-    const saved = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf-8'));
-    settings = { ...settings, ...saved }; // Merge defaults
-  } catch (e) { }
-}
-configureAI(settings.openRouterKey, settings.model);
 
-const saveTargets = () => {
-  fs.writeFileSync(DB_FILE, JSON.stringify(targets, null, 2));
-};
+configureAI(settings.openRouterKey, settings.model);
 
 // Routes
 app.get('/api/targets', (req, res) => res.json(targets));
@@ -85,28 +59,31 @@ app.post('/api/targets', (req, res) => {
     lastCheck: null
   };
   targets.push(newTarget);
-  saveTargets();
+  upsertTarget(newTarget);
   io.emit('targets_updated', targets);
   res.json(newTarget);
 });
 
 app.delete('/api/targets/:id', (req, res) => {
   targets = targets.filter(t => t.id !== req.params.id);
-  saveTargets();
+  deleteTarget(req.params.id);
   io.emit('targets_updated', targets);
   res.json({ success: true });
 });
 
 app.post('/api/settings', (req, res) => {
-  if (req.body.openRouterKey !== undefined) settings.openRouterKey = req.body.openRouterKey;
-  if (req.body.model !== undefined) settings.model = req.body.model;
+  const updates = {};
+  if (req.body.openRouterKey !== undefined) updates.openRouterKey = req.body.openRouterKey;
+  if (req.body.model !== undefined) updates.model = req.body.model;
 
   // Default Credentials
-  if (req.body.defaultPseudo !== undefined) settings.defaultPseudo = req.body.defaultPseudo;
-  if (req.body.defaultEmail !== undefined) settings.defaultEmail = req.body.defaultEmail;
-  if (req.body.defaultPassword !== undefined) settings.defaultPassword = req.body.defaultPassword;
+  if (req.body.defaultPseudo !== undefined) updates.defaultPseudo = req.body.defaultPseudo;
+  if (req.body.defaultEmail !== undefined) updates.defaultEmail = req.body.defaultEmail;
+  if (req.body.defaultPassword !== undefined) updates.defaultPassword = req.body.defaultPassword;
 
-  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+  settings = { ...settings, ...updates };
+  saveSettings(updates);
+
   configureAI(settings.openRouterKey, settings.model);
   res.json({ success: true });
 });
@@ -163,7 +140,7 @@ const updateStatus = (targetId, status) => {
   if (target) {
     target.status = status;
     target.lastCheck = new Date().toISOString();
-    saveTargets();
+    upsertTarget(target);
     io.emit('status_update', { targetId, status, lastCheck: target.lastCheck });
   }
 };
@@ -184,7 +161,7 @@ const runTargetCheck = async (target) => {
       target.forumType = result.forumType || target.forumType;
       target.robotsInfo = result.robotsInfo || target.robotsInfo;
       target.invitationCodes = result.invitationCodes || target.invitationCodes;
-      saveTargets();
+      upsertTarget(target);
       io.emit('metadata_update', {
         targetId: target.id,
         forumType: target.forumType,
@@ -302,7 +279,7 @@ startRedditMonitor((url, source) => {
     lastCheck: null
   };
   targets.push(newTarget);
-  saveTargets();
+  upsertTarget(newTarget);
   io.emit('targets_updated', targets);
   io.emit('reddit_stats', getRedditStats());
   console.log(`[REDDIT] Added new target: ${url}`);

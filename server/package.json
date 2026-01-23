@@ -15,7 +15,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.1",
     "openai": "^4.26.0",
-    "https-proxy-agent": "^7.0.2"
+    "https-proxy-agent": "^7.0.2",
+    "better-sqlite3": "^9.4.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.3"
