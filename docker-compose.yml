@@ -18,6 +18,7 @@ services:
     volumes:
       - ./server:/app
       - /app/node_modules
+      - forum_sniper_data:/app/data
     environment:
       - BROWSERLESS_HOST=browserless
       - PORT=4000
@@ -45,3 +46,7 @@ services:
 networks:
   sniper-net:
     driver: bridge
+
+volumes:
+  forum_sniper_data:
+
