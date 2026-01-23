@@ -19,7 +19,7 @@ services:
     container_name: forum_backend
     restart: unless-stopped
     ports:
-      - "4000:4000"
+      - "4010:4000"
     volumes:
       - forum_sniper_data:/app/data
       # Only mapping config/data, code is inside the image
