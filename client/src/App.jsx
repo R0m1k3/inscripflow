@@ -27,7 +27,6 @@ function App() {
     useEffect(() => {
         if (showSettings) {
             fetch(`${API_URL}/api/settings`).then(r => r.json()).then(d => {
-                setApiKey(d.openRouterKey || '');
                 // Load other settings if needed, but for now we just use a local state or ref to manage the form?
                 // Actually, let's update state to hold all settings
                 setSettingsForm({
