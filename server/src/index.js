@@ -80,7 +80,10 @@ app.post('/api/targets', (req, res) => {
       password: req.body.password || settings.defaultPassword || '',
       status: 'IDLE', // IDLE, CHECKING, OPEN, REGISTERED, ERROR
       logs: [],
-      lastCheck: null
+      lastCheck: null,
+      forumType: null,
+      robotsInfo: {},
+      invitationCodes: []
     };
     targets.push(newTarget);
     upsertTarget(newTarget);
