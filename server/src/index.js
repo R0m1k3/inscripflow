@@ -42,6 +42,7 @@ targets.forEach(t => {
 // Load Settings from DB with error handling
 let settings = {
   openRouterKey: '',
+  flaresolverr_url: '',
   defaultPseudo: '',
   defaultEmail: '',
   defaultPassword: ''
@@ -111,6 +112,7 @@ app.post('/api/settings', (req, res) => {
   const updates = {};
   if (req.body.openRouterKey !== undefined) updates.openRouterKey = req.body.openRouterKey;
   if (req.body.model !== undefined) updates.model = req.body.model;
+  if (req.body.flaresolverr_url !== undefined) updates.flaresolverr_url = req.body.flaresolverr_url;
 
   // Default Credentials
   if (req.body.defaultPseudo !== undefined) updates.defaultPseudo = req.body.defaultPseudo;

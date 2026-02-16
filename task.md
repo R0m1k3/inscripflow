@@ -1,20 +1,33 @@
-# Task: Fix Mixed Content & API Connection Issues
+# Task: Activate BMad Master Agent
 
 ## Context
 
-The user is accessing the application via HTTPS (`https://snip.vonrodbox.eu/`), but the frontend is trying to connect to the backend via insecure HTTP (`http://192.168.1.16:4010`). Browsers block this as "Mixed Content".
+The user wants to activate the `bmad-master` agent using the definition in `_bmad/core/agents/bmad-master.md`. This involves loading the configuration, adopting the persona, and presenting the agent's menu.
 
 ## Current Focus
 
-Diagnosing the deployment configuration and fixing the API URL to support HTTPS.
+Executing Party Mode Workflow.
 
 ## Master Plan
 
-- [ ] Analyze `docker-compose-unraid.yml` (if applicable) and current env vars. <!-- id: 0 -->
-- [ ] Determine correct `VITE_API_URL` configuration (`/` relative request or HTTPS URL). <!-- id: 1 -->
-- [ ] Update Frontend/Docker configuration to support HTTPS or relative paths. <!-- id: 2 -->
-- [ ] Configure Proxy (Nginx/Traefik) if necessary (User guidance). <!-- id: 3 -->
+- [x] Load and parse `_bmad/core/config.yaml`.
+- [x] Store session variables (`user_name`, `communication_language`, `output_folder`).
+- [x] Adopt `bmad-master` persona.
+- [x] Display greeting and menu in the specified language.
+- [x] Wait for user input.
+- [x] Read `_bmad/core/workflows/party-mode/workflow.md`.
+- [x] Read `_bmad/_config/agent-manifest.csv`.
+- [x] Read `_bmad/core/workflows/party-mode/steps/step-02-discussion-orchestration.md`.
+- [x] Activate Party Mode (Send welcome message).
+- [x] Initiate discussion on Cloudflare bypass solutions.
+- [x] Analyze `forum-sniper` code for config and scraping logic.
+- [x] Add `flaresolverr_url` input to `client/src/App.jsx`.
+- [x] Update `server/src/index.js` to save `flaresolverr_url`.
+- [x] Implement `solveCloudflare` in `server/src/worker.js`.
 
 ## Progress Log
 
 - [x] Task created.
+- [x] Read agent definition.
+- [x] Activated BMad Master.
+- [x] User selected Party Mode.

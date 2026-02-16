@@ -24,6 +24,7 @@ function App() {
     const [showSettings, setShowSettings] = useState(false);
     const [settingsForm, setSettingsForm] = useState({
         openRouterKey: '',
+        flaresolverr_url: '',
         defaultPseudo: '',
         defaultEmail: '',
         defaultPassword: ''
@@ -42,6 +43,7 @@ function App() {
                 // Actually, let's update state to hold all settings
                 setSettingsForm({
                     openRouterKey: d.openRouterKey || '',
+                    flaresolverr_url: d.flaresolverr_url || '',
                     defaultPseudo: d.defaultPseudo || '',
                     defaultEmail: d.defaultEmail || '',
                     defaultPassword: d.defaultPassword || ''
@@ -368,7 +370,7 @@ function App() {
                                 </div>
 
                                 <div className="space-y-4 border-b border-gray-700 pb-4 mb-4">
-                                    <h3 className="text-sm font-bold text-gray-300">AI Service</h3>
+                                    <h3 className="text-sm font-bold text-gray-300">Services</h3>
                                     <div>
                                         <label className="block text-xs text-gray-400 mb-1">OPENROUTER API KEY</label>
                                         <input
@@ -378,6 +380,17 @@ function App() {
                                             value={settingsForm.openRouterKey}
                                             onChange={e => setSettingsForm({ ...settingsForm, openRouterKey: e.target.value })}
                                         />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-gray-400 mb-1">FLARESOLVERR URL</label>
+                                        <input
+                                            type="url"
+                                            placeholder="http://localhost:8191"
+                                            className="w-full bg-black border border-gray-700 rounded p-2 focus:border-blue-500 outline-none transition-colors"
+                                            value={settingsForm.flaresolverr_url}
+                                            onChange={e => setSettingsForm({ ...settingsForm, flaresolverr_url: e.target.value })}
+                                        />
+                                        <p className="text-[10px] text-gray-500 mt-1">Required to bypass Cloudflare on protected forums.</p>
                                     </div>
                                 </div>
 
@@ -436,6 +449,7 @@ function App() {
                     </div>
                 )
             }
+
 
             {/* Analyze Modal */}
             {

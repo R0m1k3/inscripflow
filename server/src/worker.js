@@ -1,5 +1,6 @@
 import { chromium } from 'playwright-core';
 import { getAIFormFillData } from './aiService.js';
+import { getSettings } from './database.js';
 import { detectForumType, getCommonRegistrationPaths, buildRegistrationUrls } from './forumFingerprints.js';
 
 const BROWSERLESS_URL = process.env.BROWSERLESS_HOST
@@ -77,7 +78,7 @@ export async function checkTarget(target, logCallback) {
         const context = await browser.newContext();
         const page = await context.newPage();
 
-        // STEP 0: Fetch robots.txt for clues
+        // STEP 0: Fetch robots.txt (Standard check)
         try {
             const robotsUrl = new URL('/robots.txt', target.url).href;
             const robotsResponse = await fetch(robotsUrl, { signal: AbortSignal.timeout(5000) });
@@ -90,6 +91,57 @@ export async function checkTarget(target, logCallback) {
             }
         } catch (e) {
             // robots.txt not available or timeout
+        }
+
+        // STEP 0.5: FLARESOLVERR CHECK (Before Navigation)
+        const settings = getSettings();
+        if (settings.flaresolverr_url) {
+            logCallback(`FlareSolverr configured. Attempting to solve Cloudflare challenge...`);
+            try {
+                const solverResponse = await fetch(`${settings.flaresolverr_url}/v1`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        cmd: 'request.get',
+                        url: target.url,
+                        maxTimeout: 60000,
+                    })
+                });
+
+                if (solverResponse.ok) {
+                    const data = await solverResponse.json();
+                    if (data.status === 'ok' && data.solution) {
+                        logCallback(`FlareSolverr success! Injecting cookies...`);
+
+                        // Inject User-Agent
+                        await context.setExtraHTTPHeaders({
+                            'User-Agent': data.solution.userAgent
+                        });
+
+                        // Inject Cookies
+                        const cookies = data.solution.cookies.map(c => ({
+                            name: c.name,
+                            value: c.value,
+                            domain: c.domain,
+                            path: c.path,
+                            expires: c.expiry,
+                            httpOnly: c.httpOnly,
+                            secure: c.secure,
+                            sameSite: c.sameSite
+                        }));
+                        await context.addCookies(cookies);
+
+                        // If successful, we might not need to navigate again if we can just use the content?
+                        // But Playwright needs the page state. So we navigate, but cookies should bypass the challenge.
+                    } else {
+                        logCallback(`FlareSolverr failed: ${data.message || 'Unknown error'}`);
+                    }
+                } else {
+                    logCallback(`FlareSolverr error: ${solverResponse.statusText}`);
+                }
+            } catch (fsError) {
+                logCallback(`FlareSolverr connection failed: ${fsError.message}`);
+            }
         }
 
         logCallback(`Navigating to ${target.url}...`);
