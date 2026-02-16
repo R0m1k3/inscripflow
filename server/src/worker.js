@@ -247,14 +247,6 @@ export async function checkTarget(target, logCallback) {
             logCallback(`Found ${invitationCodes.length} invitation code(s): ${invitationCodes.map(c => c.code).join(', ')}`);
         }
 
-        // 1. Check for "Closed" keywords (AFTER potential navigation)
-        const bodyText = await page.innerText('body');
-        if (bodyText.match(/registration.*closed/i) || bodyText.match(/inscriptions.*fermées/i)) {
-            await browser.close();
-            return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
-        }
-
-        // 2. Search for Inputs
         // 2. Search for Inputs (checking name, id, placeholder, and labels)
         const passwordInputs = await page.locator('input[type="password"]').count();
         const emailInputs = await page.locator('input[type="email"], input[name*="mail"], input[placeholder*="mail"], input[placeholder*="courriel"]').count();
@@ -266,6 +258,17 @@ export async function checkTarget(target, logCallback) {
         // Also check labels if input attributes are missing
         const labelInvite = await page.locator('label', { hasText: /invitation|invite|code/i }).count();
         const needsInvite = inviteInputs > 0 || labelInvite > 0;
+
+        // 1. Check for "Closed" keywords (AFTER checking for valid forms)
+        // Only treat as closed if we found NO inputs, OR if we found inputs but it's not a clear login/register form
+        const hasAnyForm = (emailInputs > 0 && passwordInputs > 0) || needsInvite;
+
+        const bodyText = await page.innerText('body');
+        if (!hasAnyForm && (bodyText.match(/registration.*closed/i) || bodyText.match(/inscriptions.*fermées/i))) {
+            logCallback(`Registration appears closed.`);
+            await browser.close();
+            return { success: false, open: false, forumType: detectedForumType, robotsInfo: robotsTxtInfo, invitationCodes };
+        }
 
         if (needsInvite) {
             const submitBtn = page.locator('button[type="submit"], input[type="submit"]').first();
