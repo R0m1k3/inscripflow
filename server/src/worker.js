@@ -142,10 +142,35 @@ export async function checkTarget(target, logCallback) {
             } catch (fsError) {
                 logCallback(`FlareSolverr connection failed: ${fsError.message}`);
             }
+        } else {
+            logCallback(`FlareSolverr NOT configured. Proceeding with standard navigation.`);
         }
 
         logCallback(`Navigating to ${target.url}...`);
-        await page.goto(target.url, { timeout: 30000, waitUntil: 'domcontentloaded' });
+        try {
+            await page.goto(target.url, { timeout: 30000, waitUntil: 'domcontentloaded' });
+        } catch (navError) {
+            logCallback(`Navigation warning: ${navError.message}`);
+        }
+
+        // CLOUDFLARE CHECK (Post-Navigation)
+        const pageTitle = await page.title();
+        const pageContent = await page.content();
+
+        if (pageTitle.includes('Just a moment') ||
+            pageContent.includes('challenge-platform') ||
+            pageContent.includes('cf-turnstile')) {
+
+            logCallback(`⚠️ CLOUDFLARE DETECTED! (Title: "${pageTitle}")`);
+
+            if (!settings.flaresolverr_url) {
+                logCallback(`❌ FlareSolverr is missing! Please configure it in AI CONFIG to bypass this.`);
+                await browser.close();
+                return { success: false, open: false, forumType: 'Cloudflare', robotsInfo: robotsTxtInfo, invitationCodes };
+            } else {
+                logCallback(`ℹ️ FlareSolverr was tried. If you see this, the bypass might have failed or needs tuning.`);
+            }
+        }
 
         // STEP 1: FORUM FINGERPRINTING
         const initialHtml = await page.content();
